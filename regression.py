@@ -10,12 +10,38 @@ def train_test_split(x, y, test_ratio=0.2):
     
     return x[train_idx], y[train_idx], x[test_idx], y[test_idx]
 
-def fit_polynomial(x_train, y_train, degree):
-    coeffs = np.polyfit(x_train, y_train, degree)
-    return coeffs
+# def fit_polynomial(x_train, y_train, degree):
+#     coeffs = np.polyfit(x_train, y_train, degree)
+#     return coeffs
 
-def predict(x, coeffs):
-    return np.polyval(coeffs, x)
+def fit_polynomial(x_train, y_train, degree):
+    M = degree
+    N = len(x_train)
+
+    # Строим матрицу A размером (M+1) x (M+1)
+    # A[i, j] = сумма всех x_k^(i+j)
+    A = np.zeros((M + 1, M + 1))
+    for i in range(M + 1):
+        for j in range(M + 1):
+            A[i, j] = np.sum(x_train ** (i + j))
+
+    # Строим вектор b длиной (M+1)
+    # b[i] = сумма всех y_k * x_k^i
+    b = np.zeros(M + 1)
+    for i in range(M + 1):
+        b[i] = np.sum(y_train * (x_train ** i))
+
+    # Решаем систему A*w = b
+    w = np.linalg.solve(A, b)
+    return w   # w[0]=свободный член, w[1]=коэф при x, w[2]=коэф при x^2...
+
+# def predict(x, coeffs):
+#     return np.polyval(coeffs, x)
+def predict(x, w):
+    y_pred = np.zeros_like(x, dtype=float)
+    for i, wi in enumerate(w):
+        y_pred += wi * (x ** i)   # w[0]*x^0 + w[1]*x^1 + w[2]*x^2 + ...
+    return y_pred
 
 def mse(y_true, y_pred):
     return np.mean((y_true - y_pred) ** 2)
