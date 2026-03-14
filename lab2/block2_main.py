@@ -6,13 +6,11 @@ from config import SEED, N, DPI, OUTPUT_FILE_BLOCK2, OUTPUT_FILE_BLOCK2_CM
 from generators import DATASETS, split_data
 from perceptron import Perceptron, confusion_matrix, accuracy
 
-
 def _env_float(name, default):
     try:
         return float(os.environ.get(name, str(default)))
     except (TypeError, ValueError):
         return float(default)
-
 
 def _env_int(name, default):
     try:
@@ -20,19 +18,16 @@ def _env_int(name, default):
     except (TypeError, ValueError):
         return int(default)
 
-
 STEP_LR = _env_float('SMGMO2_STEP_LR', 0.03)
 STEP_EPOCHS = _env_int('SMGMO2_STEP_EPOCHS', 1000)
 SIGMOID_LR = _env_float('SMGMO2_SIGMOID_LR', 0.03)
 SIGMOID_EPOCHS = _env_int('SMGMO2_SIGMOID_EPOCHS', 1000)
 
 ACTIVATIONS = [
-    ('step',    'Ступенчатая', STEP_LR,    STEP_EPOCHS),
-    ('sigmoid', 'Сигмоида',    SIGMOID_LR, SIGMOID_EPOCHS),
+    ('step', 'Ступенчатая', STEP_LR, STEP_EPOCHS),
+    ('sigmoid', 'Сигмоида', SIGMOID_LR, SIGMOID_EPOCHS),
 ]
 
-
-# ── train all models once ──────────────────────────────────────────────
 def train_all():
     results = {}
     for act, _name, lr, epochs in ACTIVATIONS:
@@ -54,8 +49,6 @@ def train_all():
             })
     return results
 
-
-# ── figure 1: decision boundaries ─────────────────────────────────────
 def show_boundaries(results):
     fig, axes = plt.subplots(2, 4, figsize=(16, 8))
     fig.suptitle(
@@ -74,7 +67,6 @@ def show_boundaries(results):
                 ax.scatter(x_te[m, 0], x_te[m, 1],
                            s=18, alpha=0.55, color=colors[cls])
 
-            # decision boundary: w0 + w1*x1 + w2*x2 = 0
             x1 = np.linspace(x[:, 0].min() - 0.3, x[:, 0].max() + 0.3, 400)
             x2 = entry['model'].boundary_x2(x1)
             if x2 is not None:
@@ -95,8 +87,6 @@ def show_boundaries(results):
     plt.savefig(OUTPUT_FILE_BLOCK2, dpi=DPI, bbox_inches='tight')
     plt.show()
 
-
-# ── figure 2: confusion matrices ──────────────────────────────────────
 def _draw_cm(ax, cm, title, acc):
     ax.imshow(cm, interpolation='nearest', cmap='Blues', vmin=0)
     ax.set_title(f'{title}\nAcc = {acc:.3f}', fontsize=10)
@@ -111,7 +101,6 @@ def _draw_cm(ax, cm, title, acc):
             ax.text(j, i, str(cm[i, j]),
                     ha='center', va='center',
                     color=c, fontsize=13, fontweight='bold')
-
 
 def show_confusion_matrices(results):
     fig, axes = plt.subplots(2, 4, figsize=(14, 7))
@@ -132,7 +121,6 @@ def show_confusion_matrices(results):
     plt.savefig(OUTPUT_FILE_BLOCK2_CM, dpi=DPI, bbox_inches='tight')
     plt.show()
 
-    # ── console summary ──────────────────────────────────────────────
     col_w = 22
     print('\n' + '=' * (10 + col_w * len(ACTIVATIONS)))
     header = f"{'Датасет':<10}"
@@ -148,14 +136,11 @@ def show_confusion_matrices(results):
         print(row_str)
     print('=' * (10 + col_w * len(ACTIVATIONS)))
 
-
-# ── entry point ────────────────────────────────────────────────────────
 def main():
     print(f'Обучение моделей (N = {N})...')
     results = train_all()
     show_boundaries(results)
     show_confusion_matrices(results)
-
 
 if __name__ == '__main__':
     main()
