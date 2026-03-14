@@ -198,28 +198,21 @@ def make_circles(n=1200, noise=0.08, factor=0.45, seed=42):
 кольца и не может корректно разделить классы.
 
 #figure(
-  block(
-    width: 70%,
-    inset: 10pt,
-    stroke: 0.5pt + gray,
-    radius: 4pt,
-    [Заглушка рисунка: `circles.png` (добавьте файл в папку `lab2/`).],
-  ),
-  caption: [Распределение circles (пример генерации).],
+  image("task2_block1_circles.png", width: 70%),
+  caption: [Распределение circles: внутренняя окружность — класс 0, внешняя — класс 1, $N = 200$.],
 )
 
 *Переобучение в playground.tensorflow.org (пример настройки):*
 
-- hidden layers: `8, 8, 8`;
-- activation: `tanh`;
-- regularization: `none`;
-- learning rate: `0.03`;
-- training size: `10%`;
-- noise: `8%`;
-- epochs: `> 2000`.
-
 Наблюдается малый train-loss и заметно больший test-loss, а также
 избыточно «изломанная» граница решения.
+
+#figure(
+  image("overfitting_citcles.png", width: 100%),
+  caption: [Переобучение для circles в playground.tensorflow.org:
+            training loss стремится к нулю, при этом test-loss остаётся
+            заметно выше.],
+)
 
 == 2.2 XOR-распределение
 
@@ -246,27 +239,21 @@ def make_xor(n=1200, noise=0.12, seed=42):
 выделить диагонально противоположные области как один класс.
 
 #figure(
-  block(
-    width: 70%,
-    inset: 10pt,
-    stroke: 0.5pt + gray,
-    radius: 4pt,
-    [Заглушка рисунка: `xor.png` (добавьте файл в папку `lab2/`).],
-  ),
-  caption: [Распределение XOR (пример генерации).],
+  image("task2_block1_xor.png", width: 70%),
+  caption: [Распределение XOR: четыре кластера, метки по правилу $x_1 x_2 < 0$, $N = 200$.],
 )
 
 *Переобучение (пример настройки playground):*
 
-- hidden layers: `10, 10, 10`;
-- activation: `relu`;
-- regularization: `none`;
-- learning rate: `0.03`;
-- training size: `10%`;
-- noise: `12%`.
-
 Получается практически идеальная подгонка train и заметный провал на
 test при усложнении границы.
+
+#figure(
+  image("overfitting_xor.png", width: 100%),
+  caption: [Переобучение для XOR в playground.tensorflow.org: сеть
+            формирует сложную нелинейную область решения и подгоняет
+            обучающую выборку почти без ошибки.],
+)
 
 == 2.3 Гауссовские кластеры (blobs)
 
@@ -295,26 +282,21 @@ def make_blobs(n=1200, std=0.35, seed=42):
 ошибка классификации возрастает.
 
 #figure(
-  block(
-    width: 70%,
-    inset: 10pt,
-    stroke: 0.5pt + gray,
-    radius: 4pt,
-    [Заглушка рисунка: `blobs.png` (добавьте файл в папку `lab2/`).],
-  ),
-  caption: [Распределение blobs (пример генерации).],
+  image("task2_block1_blobs.png", width: 70%),
+  caption: [Распределение blobs: два гауссовских кластера, $N = 200$.],
 )
 
 *Переобучение (пример настройки playground):*
 
-- hidden layers: `12, 12, 12`;
-- activation: `tanh`;
-- regularization: `none`;
-- training size: `5%`;
-- noise: `15%`.
-
 Даже на сравнительно простой структуре при очень малом train наборе
 модель начинает запоминать частные флуктуации точек.
+
+#figure(
+  image("overfitting_blobs.png", width: 100%),
+  caption: [Переобучение для blobs в playground.tensorflow.org:
+            граница решения начинает описывать частные особенности
+            подвыборки вместо общей линейной структуры.],
+)
 
 == 2.4 Спирали Архимеда (spiral)
 
@@ -353,27 +335,21 @@ def make_spiral(n=1200, noise=0.10, turns=2.5, seed=42):
 границы.
 
 #figure(
-  block(
-    width: 70%,
-    inset: 10pt,
-    stroke: 0.5pt + gray,
-    radius: 4pt,
-    [Заглушка рисунка: `spiral.png` (добавьте файл в папку `lab2/`).],
-  ),
-  caption: [Распределение spiral (пример генерации).],
+  image("task2_block1_spiral.png", width: 70%),
+  caption: [Распределение spiral: две спирали Архимеда, сдвинутые на $pi$, $N = 200$.],
 )
 
 *Переобучение (пример настройки playground):*
 
-- hidden layers: `16, 16, 16`;
-- activation: `tanh`;
-- regularization: `none`;
-- learning rate: `0.01`;
-- training size: `10%`;
-- epochs: `3000+`.
-
 Наблюдается сложная «рваная» граница с низким train-loss и заметно
 более высоким test-loss.
+
+#figure(
+  image("overfitting_spiral.png", width: 100%),
+  caption: [Переобучение для spiral в playground.tensorflow.org:
+            модель строит сложную извилистую границу и демонстрирует
+            существенный разрыв между train и test-loss.],
+)
 
 // ─────────────────────────────────────────────────────────
 // 4. Часть II — Элементарный перцептрон
@@ -644,5 +620,5 @@ SMGMO/
 )
 
 В отчёт могут быть добавлены скриншоты из playground для каждого случая
-(граница классов, кривые loss, значения train/test loss в конце
+(граница классов, кривые loss, значения train/test-loss в конце
 обучения).
