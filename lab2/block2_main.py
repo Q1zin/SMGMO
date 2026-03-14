@@ -1,13 +1,34 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 from config import SEED, N, DPI, OUTPUT_FILE_BLOCK2, OUTPUT_FILE_BLOCK2_CM
 from generators import DATASETS, split_data
 from perceptron import Perceptron, confusion_matrix, accuracy
 
+
+def _env_float(name, default):
+    try:
+        return float(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _env_int(name, default):
+    try:
+        return int(os.environ.get(name, str(default)))
+    except (TypeError, ValueError):
+        return int(default)
+
+
+STEP_LR = _env_float('SMGMO2_STEP_LR', 0.03)
+STEP_EPOCHS = _env_int('SMGMO2_STEP_EPOCHS', 1000)
+SIGMOID_LR = _env_float('SMGMO2_SIGMOID_LR', 0.03)
+SIGMOID_EPOCHS = _env_int('SMGMO2_SIGMOID_EPOCHS', 1000)
+
 ACTIVATIONS = [
-    ('step',    'Ступенчатая', 0.1,  300),
-    ('sigmoid', 'Сигмоида',    0.5,  800),
+    ('step',    'Ступенчатая', STEP_LR,    STEP_EPOCHS),
+    ('sigmoid', 'Сигмоида',    SIGMOID_LR, SIGMOID_EPOCHS),
 ]
 
 

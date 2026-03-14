@@ -1,7 +1,7 @@
 import os
 import matplotlib.pyplot as plt
 
-from config import SEED, N, DPI, OUTPUT_FILE_BLOCK1
+from config import AXIS_LIMIT, DPI, N, NOISE, OUTPUT_FILE_BLOCK1, SEED
 from generators import DATASETS
 
 COLORS = ['steelblue', 'tomato']
@@ -21,6 +21,8 @@ def _plot_single(ax, name, make_fn):
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
     ax.set_aspect('equal', adjustable='box')
+    ax.set_xlim(-AXIS_LIMIT, AXIS_LIMIT)
+    ax.set_ylim(-AXIS_LIMIT, AXIS_LIMIT)
 
 
 def main_single(ds_name):
@@ -31,7 +33,7 @@ def main_single(ds_name):
     name, make_fn = entry
     fig, ax = plt.subplots(figsize=(6, 6))
     fig.suptitle(
-        f'Задание 2. Блок I — {name}  (N = {N})',
+        f'Задание 2. Блок I — {name}  (N = {N}, noise = {NOISE})',
         fontsize=13, fontweight='bold',
     )
     _plot_single(ax, name, make_fn)
@@ -46,7 +48,7 @@ def main_all():
     """Show all four datasets in one figure (fallback)."""
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
     fig.suptitle(
-        f'Задание 2. Блок I — Генерация выборок  (N = {N})',
+        f'Задание 2. Блок I — Генерация выборок  (N = {N}, noise = {NOISE})',
         fontsize=14, fontweight='bold',
     )
     for ax, (name, make_fn) in zip(axes.flat, DATASETS):

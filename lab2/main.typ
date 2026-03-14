@@ -45,6 +45,8 @@
   )
 }
 
+#import "@preview/fletcher:0.5.8": diagram, node, edge
+
 // ─────────────────────────────────────────────────────────
 // Содержание
 // ─────────────────────────────────────────────────────────
@@ -135,7 +137,6 @@ $ phi_"step"(a) = 1 " при " a >= 0, " иначе " 0. $
 $ Delta w_tilde = eta dot y_tilde dot x_tilde, quad y_tilde = 2y - 1. $
 
 2) *Сигмоида*
-
 $ phi_sigma(a) = 1 / (1 + e^(-a)). $
 
 Для неё применяется градиентный спуск с обратным распространением
@@ -151,18 +152,36 @@ circles и spiral без нелинейного преобразования п�
 // ─────────────────────────────────────────────────────────
 = Часть I. Генерирование обучающих и тестовых выборок
 
-Во всех экспериментах признаки нормируются к диапазону, близкому к
-$[-1, 1]$, после генерации выполняется случайное перемешивание выборки.
+Во всех экспериментах точки генерируются на плоскости в диапазоне,
+близком к $[-6, 6]$. После добавления шума координаты
+ограничиваются этим интервалом, а затем выборка случайно перемешивается.
 
 == Общие параметры генерации
 
-- Размер полной выборки: $N = 1200$;
+- Размер полной выборки: по умолчанию $N = 200$;
 - Разбиение: $70%$ train, $30%$ test;
 - Шум по признакам: $epsilon ~ cal(N)(0, sigma^2 I_2)$,
-  использовано $sigma = 0.08$ (если не указано иначе);
+  по умолчанию используется `noise = 0.8`;
+- Диапазон координат после генерации: $[-6, 6]$;
 - `seed = 42`.
 
-== 2.1 Концентрические окружности (circles)
+== Обучающая, валидационная и тестовая выборки
+
+В задаче классификации данные обычно делят на три части:
+
+- *train* --- используется для обновления параметров модели;
+- *validation* --- используется для подбора гиперпараметров;
+- *test* --- используется только для финальной оценки качества.
+
+В текущей реализации используется разбиение *train/test* в пропорции
+$70/30$. На playground роль validation и test фактически играет
+отложенная (необучающая) часть выборки.
+
+Переобучение проявляется как существенный разрыв ошибок:
+$L_"train" << L_"test"$. Обычно это связано с избыточной сложностью
+сети и малым объёмом обучающих данных.
+
+== Концентрические окружности (circles)
 
 Математически классы формируются точками двух окружностей с радиусами
 $r_1 < r_2$:
@@ -175,21 +194,24 @@ $ x = (r cos theta, r sin theta), quad theta ~ U[0, 2 pi]. $
 ```python
 import numpy as np
 
-def make_circles(n=1200, noise=0.08, factor=0.45, seed=42):
+from config import AXIS_LIMIT, NOISE
+
+def make_circles(n=200, noise=None, factor=0.45, seed=42):
+    if noise is None:
+        noise = NOISE
     rng = np.random.default_rng(seed)
-    n1 = n // 2
-    n2 = n - n1
-
-    t1 = rng.uniform(0, 2*np.pi, size=n1)
-    t2 = rng.uniform(0, 2*np.pi, size=n2)
-
-    inner = np.c_[factor*np.cos(t1), factor*np.sin(t1)]
-    outer = np.c_[np.cos(t2), np.sin(t2)]
+    n1, n2 = n // 2, n - n // 2
+    t1 = rng.uniform(0, 2 * np.pi, n1)
+    t2 = rng.uniform(0, 2 * np.pi, n2)
+    outer_radius = AXIS_LIMIT * 0.75
+    inner_radius = outer_radius * factor
+    inner = np.c_[inner_radius * np.cos(t1), inner_radius * np.sin(t1)]
+    outer = np.c_[outer_radius * np.cos(t2), outer_radius * np.sin(t2)]
 
     x = np.vstack([inner, outer])
     y = np.hstack([np.zeros(n1, dtype=int), np.ones(n2, dtype=int)])
-
-    x += rng.normal(0, noise, size=x.shape)
+    x += rng.normal(0, noise, x.shape)
+    x = np.clip(x, -AXIS_LIMIT, AXIS_LIMIT)
     idx = rng.permutation(n)
     return x[idx], y[idx]
 ```
@@ -214,7 +236,7 @@ def make_circles(n=1200, noise=0.08, factor=0.45, seed=42):
             заметно выше.],
 )
 
-== 2.2 XOR-распределение
+== XOR-распределение
 
 Формируются четыре кластера, расположенные около вершин квадрата
 $(-1, -1), (-1, 1), (1, -1), (1, 1)$. Метка задаётся правилом XOR:
@@ -222,15 +244,17 @@ $(-1, -1), (-1, 1), (1, -1), (1, 1)$. Метка задаётся правило
 $ y = [x_1 x_2 < 0]. $
 
 ```python
-def make_xor(n=1200, noise=0.12, seed=42):
+def make_xor(n=200, noise=None, seed=42):
+    if noise is None:
+        noise = NOISE
     rng = np.random.default_rng(seed)
     n4 = n // 4
-    centers = np.array([[-1, -1], [-1, 1], [1, -1], [1, 1]], dtype=float)
-
-    chunks = [rng.normal(c, noise, size=(n4, 2)) for c in centers]
-    x = np.vstack(chunks)
+    center = AXIS_LIMIT * 0.5
+    centers = [(-center, -center), (-center, center), (center, -center), (center, center)]
+    parts = [np.array(c) + rng.normal(0, noise, (n4, 2)) for c in centers]
+    x = np.vstack(parts)
+    x = np.clip(x, -AXIS_LIMIT, AXIS_LIMIT)
     y = ((x[:, 0] * x[:, 1]) < 0).astype(int)
-
     idx = rng.permutation(len(x))
     return x[idx], y[idx]
 ```
@@ -255,30 +279,31 @@ test при усложнении границы.
             обучающую выборку почти без ошибки.],
 )
 
-== 2.3 Гауссовские кластеры (blobs)
+== Гауссовские кластеры (blobs)
 
 Каждый класс моделируется двумерным нормальным распределением:
 
 $ x | y = c ~ cal(N)(mu_c, sigma_c^2 I_2). $
 
 ```python
-def make_blobs(n=1200, std=0.35, seed=42):
+def make_blobs(n=200, noise=None, seed=42):
+    if noise is None:
+        noise = NOISE
     rng = np.random.default_rng(seed)
-    n1 = n // 2
-    n2 = n - n1
-
-    c0 = rng.normal(loc=[-1.0, -1.0], scale=std, size=(n1, 2))
-    c1 = rng.normal(loc=[1.0, 1.0], scale=std, size=(n2, 2))
+    n1, n2 = n // 2, n - n // 2
+    center = AXIS_LIMIT * 0.5
+    c0 = rng.normal(0, noise, (n1, 2)) + np.array([-center, -center])
+    c1 = rng.normal(0, noise, (n2, 2)) + np.array([center, center])
 
     x = np.vstack([c0, c1])
+    x = np.clip(x, -AXIS_LIMIT, AXIS_LIMIT)
     y = np.hstack([np.zeros(n1, dtype=int), np.ones(n2, dtype=int)])
-
     idx = rng.permutation(n)
     return x[idx], y[idx]
 ```
 
-При малом `std` и достаточном расстоянии между центрами задача почти
-линейно разделима; при росте `std` появляется перекрытие классов и
+При малом шуме и достаточном расстоянии между центрами задача почти
+линейно разделима; при росте `noise` появляется перекрытие классов и
 ошибка классификации возрастает.
 
 #figure(
@@ -298,7 +323,7 @@ def make_blobs(n=1200, std=0.35, seed=42):
             подвыборки вместо общей линейной структуры.],
 )
 
-== 2.4 Спирали Архимеда (spiral)
+== Спирали Архимеда (spiral)
 
 Классические двухклассовые спирали задаются в полярных координатах:
 
@@ -309,24 +334,24 @@ x_2 = r sin theta. $
 Вторая спираль получается сдвигом фазы на $pi$.
 
 ```python
-def make_spiral(n=1200, noise=0.10, turns=2.5, seed=42):
+def make_spiral(n=200, noise=None, turns=2.5, seed=42):
+    if noise is None:
+        noise = NOISE
     rng = np.random.default_rng(seed)
-    n1 = n // 2
-    n2 = n - n1
+    n1, n2 = n // 2, n - n // 2
+    t1 = np.linspace(0, turns * np.pi, n1)
+    t2 = np.linspace(0, turns * np.pi, n2)
+    max_radius = AXIS_LIMIT * 0.75
+    r1 = max_radius * t1 / (turns * np.pi)
+    r2 = max_radius * t2 / (turns * np.pi)
 
-    t1 = np.linspace(0, turns*np.pi, n1)
-    t2 = np.linspace(0, turns*np.pi, n2)
-
-    r1 = t1 / (turns*np.pi)
-    r2 = t2 / (turns*np.pi)
-
-    x1 = np.c_[r1*np.cos(t1), r1*np.sin(t1)]
-    x2 = np.c_[r2*np.cos(t2 + np.pi), r2*np.sin(t2 + np.pi)]
+    x1 = np.c_[r1 * np.cos(t1), r1 * np.sin(t1)]
+    x2 = np.c_[r2 * np.cos(t2 + np.pi), r2 * np.sin(t2 + np.pi)]
 
     x = np.vstack([x1, x2])
-    x += rng.normal(0, noise, size=x.shape)
+    x += rng.normal(0, noise, x.shape)
+    x = np.clip(x, -AXIS_LIMIT, AXIS_LIMIT)
     y = np.hstack([np.zeros(n1, dtype=int), np.ones(n2, dtype=int)])
-
     idx = rng.permutation(n)
     return x[idx], y[idx]
 ```
@@ -356,7 +381,7 @@ def make_spiral(n=1200, noise=0.10, turns=2.5, seed=42):
 // ─────────────────────────────────────────────────────────
 = Часть II. Реализация элементарного перцептрона
 
-== 3.1 Математическая модель
+== Математическая модель
 
 Линейная комбинация признаков:
 
@@ -370,73 +395,119 @@ $ y_hat = phi(a). $
 Для сигмоиды $y_hat in (0, 1)$, а класс определяется порогом
 $0.5$.
 
-== 3.2 Код реализации
+== Код реализации
 
 ```python
 import numpy as np
+import time
 
 class Perceptron:
-    def __init__(self, activation='step', learning_rate=0.05,
-                 n_epochs=200, seed=42):
+    def __init__(self, activation='step', lr=0.1, n_epochs=300, seed=42):
         self.activation = activation
-        self.learning_rate = learning_rate
+        self.lr = lr
         self.n_epochs = n_epochs
-        self.rng = np.random.default_rng(seed)
+        self.seed = seed
         self.w = None
-
-    def _step(self, a):
-        return (a >= 0).astype(int)
+        self.train_time = 0.0
 
     def _sigmoid(self, a):
-        return 1.0 / (1.0 + np.exp(-a))
-
-    def _forward(self, x):
-        a = x @ self.w
-        if self.activation == 'step':
-            return self._step(a)
-        return self._sigmoid(a)
+        return 1.0 / (1.0 + np.exp(-np.clip(a, -500, 500)))
 
     def fit(self, x, y):
-        # Добавляем bias: x0 = 1
+        rng = np.random.default_rng(self.seed)
         xb = np.c_[np.ones(len(x)), x]
-        self.w = self.rng.normal(0, 0.1, size=xb.shape[1])
+        self.w = rng.normal(0, 0.01, xb.shape[1])
+        y_norm = 2 * y - 1
+        t0 = time.perf_counter()
 
         if self.activation == 'step':
-            # Алгоритм сходимости перцептрона
-            y_norm = 2 * y - 1
             for _ in range(self.n_epochs):
-                errors = 0
+                changed = False
                 for i in range(len(xb)):
                     pred = 1 if (xb[i] @ self.w) >= 0 else 0
                     if pred != y[i]:
-                        self.w += self.learning_rate * y_norm[i] * xb[i]
-                        errors += 1
-                if errors == 0:
+                        self.w += self.lr * y_norm[i] * xb[i]
+                        changed = True
+                if not changed:
                     break
         else:
-            # Градиентный спуск для сигмоиды
             for _ in range(self.n_epochs):
-                y_hat = self._sigmoid(xb @ self.w)
-                grad = (-2.0 * (y - y_hat) * y_hat * (1 - y_hat)) @ xb
-                grad /= len(xb)
-                self.w -= self.learning_rate * grad
+                yh = self._sigmoid(xb @ self.w)
+                delta = -2.0 * (y - yh) * yh * (1.0 - yh)
+                grad = (delta @ xb) / len(xb)
+                self.w -= self.lr * grad
 
-    def predict_proba(self, x):
+        self.train_time = time.perf_counter() - t0
+
+    def predict(self, x):
         xb = np.c_[np.ones(len(x)), x]
+        a = xb @ self.w
         if self.activation == 'step':
-            return self._forward(xb).astype(float)
-        return self._sigmoid(xb @ self.w)
-
-    def predict(self, x, threshold=0.5):
-        p = self.predict_proba(x)
-        return (p >= threshold).astype(int)
+            return (a >= 0).astype(int)
+        return (self._sigmoid(a) >= 0.5).astype(int)
 ```
 
-== 3.3 Вычислительный граф и локальные производные
+== Где это реализовано в проекте
 
-Для сигмоидального перцептрона вычислительный граф:
+- Файл `perceptron.py`, метод `fit`:
+  - ветка `if self.activation == 'step'` --- обучение по правилу
+    сходимости перцептрона (обновление только при ошибке);
+  - ветка `else` --- градиентный спуск для сигмоидальной модели
+    по производной MSE.
+- Файл `perceptron.py`, метод `predict` --- пороговая классификация
+  (`a >= 0` для step и `sigma(a) >= 0.5` для sigmoid).
+- Файл `block2_main.py`, константа `ACTIVATIONS` --- реальные
+  гиперпараметры запуска читаются из переменных окружения
+  `SMGMO2_STEP_LR`, `SMGMO2_STEP_EPOCHS`,
+  `SMGMO2_SIGMOID_LR`, `SMGMO2_SIGMOID_EPOCHS`
+  (по умолчанию: `lr = 0.03`, `epochs = 1000` для обеих моделей).
+- Файл `block2_main.py`, функция `train_all` --- полный цикл
+  `генерация -> split_data -> fit -> predict -> confusion_matrix`.
 
-$ x_i, w_i -> a = sum_i w_i x_i -> y_hat = sigma(a) -> E = (y - y_hat)^2. $
+== Вычислительный граф и локальные производные
+
+Для сигмоидального перцептрона вычислительный граф показан на рисунке ниже.
+
+#figure(
+  diagram(
+    node-stroke: .5pt,
+    node-fill: luma(248),
+    spacing: (1.8cm, 0.9cm),
+    node((0,0), $x_1$),
+    node((0,2), $x_2$),
+    node((0,4), $1$),
+    node((2,2), $a$),
+    node((4,2), $hat(y)$),
+    node((6,2), $E$),
+    edge((0,0), (2,2), $w_1$, "->"),
+    edge((0,2), (2,2), $w_2$, "->"),
+    edge((0,4), (2,2), $w_0$, "->"),
+    edge((2,2), (4,2), $sigma(dot)$, "->"),
+    edge((4,2), (6,2), "->"),
+  ),
+  caption: [Вычислительный граф элементарного перцептрона.],
+)
+
+Граф отражает последовательность вычислений при прямом и обратном
+проходе:
+
+1. *Входной слой.* Три узла слева — признаки $x_1$, $x_2$ и
+   фиктивный вход $1$ (bias). Каждый из них соединён с узлом $a$
+   ребром с соответствующим весом $w_0, w_1, w_2$.
+
+2. *Линейная комбинация.* В узле $a$ вычисляется взвешенная сумма:
+   $ a = w_0 dot 1 + w_1 x_1 + w_2 x_2 = tilde(w)^T tilde(x). $
+
+3. *Функция активации.* Ребро $sigma(dot)$ применяет сигмоиду:
+   $ hat(y) = sigma(a) = frac(1, 1 + e^(-a)). $
+   Выход $hat(y) in (0, 1)$ интерпретируется как вероятность класса $1$.
+
+4. *Функция потерь.* В узле $E$ вычисляется квадратичная ошибка:
+   $ E = (y - hat(y))^2. $
+
+При *обратном проходе* ошибка $E$ распространяется по тем же рёбрам
+справа налево. По правилу цепочки на каждом ребре перемножаются
+локальные производные — это и есть алгоритм backpropagation.
 
 Локальные производные:
 
@@ -448,11 +519,7 @@ $ (partial a)/(partial w_i) = x_i. $
 
 По правилу цепочки:
 
-$ (partial E)/(partial w_i)
-= (partial E)/(partial y_hat)
-dot (partial y_hat)/(partial a)
-dot (partial a)/(partial w_i)
-= -2(y - y_hat) y_hat(1 - y_hat) x_i. $
+$ (partial E)/(partial w_i) = (partial E)/(partial y_hat) dot (partial y_hat)/(partial a) dot (partial a)/(partial w_i) = -2(y - y_hat) y_hat(1 - y_hat) x_i. $
 
 Обновление весов:
 
@@ -462,7 +529,7 @@ $ w_i <- w_i - eta (partial E)/(partial w_i). $
 почти всюду, поэтому используется не backprop, а правило коррекции
 ошибок перцептрона.
 
-== 3.4 Обучение и оценка
+== Обучение и оценка
 
 Разбиение выборок на train/test выполняется в пропорции $70/30$:
 
@@ -477,28 +544,45 @@ def split_data(x, y, test_ratio=0.3, seed=42):
 
 Параметры обучения:
 
-- ступенчатый перцептрон: `learning_rate = 0.05`, `n_epochs = 200`;
-- сигмоидальный перцептрон: `learning_rate = 0.1`, `n_epochs = 800`.
+- параметры `step`: `learning_rate = 0.03`, `n_epochs = 1000`;
+- параметры `sigmoid`: `learning_rate = 0.03`, `n_epochs = 1000`.
+
+Параметры можно менять отдельно через GUI (поля для step и sigmoid).
+
+#figure(
+  image("matrix.png", width: 100%),
+  caption: [Как интерпретировать confusion matrix для модели машинного обучения],
+)
+
+=== Визуализация результатов блока 2
+
+#figure(
+  image("task2_block2_boundaries.png", width: 100%),
+  caption: [Разделяющие границы перцептрона для всех распределений (step и sigmoid).],
+)
+
+#figure(
+  image("task2_block2_cm.png", width: 100%),
+  caption: [Матрицы ошибок перцептрона для всех распределений (step и sigmoid).],
+)
 
 === Матрицы ошибок (confusion matrix)
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto, auto),
+    columns: (auto, auto, auto, auto, auto, auto),
     align: center,
     stroke: 0.5pt,
     fill: (col, row) => if row == 0 { luma(220) } else { white },
-    [*Модель*], [*Распределение*], [*TN*], [*FP*], [*FN / TP*],
-
-    [Step], [Circles], [132], [48], [46 / 134],
-    [Step], [XOR],     [116], [64], [68 / 112],
-    [Step], [Blobs],   [171], [9],  [8 / 172],
-    [Step], [Spiral],  [111], [69], [72 / 108],
-
-    [Sigmoid], [Circles], [138], [42], [44 / 136],
-    [Sigmoid], [XOR],     [120], [60], [63 / 117],
-    [Sigmoid], [Blobs],   [173], [7],  [7 / 173],
-    [Sigmoid], [Spiral],  [115], [65], [69 / 111],
+    [*Модель*], [*Распределение*], [*TN*], [*FP*], [*FN*], [*TP*],
+    [Step], [Circles], [79],  [102], [81], [98],
+    [Step], [XOR],     [93],  [95],  [86], [86],
+    [Step], [Blobs],   [176], [0],   [0], [184],
+    [Step], [Spiral],  [116], [60],  [104], [80],
+    [Sigmoid], [Circles], [87],  [94],  [83], [96],
+    [Sigmoid], [XOR],     [77],  [111], [46], [126],
+    [Sigmoid], [Blobs],   [176], [0],   [0], [184],
+    [Sigmoid], [Spiral],  [97],  [79],  [79], [105],
   ),
   caption: [Матрицы ошибок (сводные значения по test-выборке).],
 )
@@ -507,26 +591,24 @@ def split_data(x, y, test_ratio=0.3, seed=42):
 
 #figure(
   table(
-    columns: (auto, auto, auto, auto, auto),
+    columns: (auto, auto, auto, auto, auto, auto),
     align: center,
     stroke: 0.5pt,
     fill: (col, row) => if row == 0 { luma(220) } else { white },
-    [*Модель*], [*Распределение*], [*Accuracy*], [*Precision*], [*Recall / F1*],
-
-    [Step], [Circles], [0.739], [0.736], [0.744 / 0.740],
-    [Step], [XOR],     [0.633], [0.636], [0.622 / 0.629],
-    [Step], [Blobs],   [0.953], [0.950], [0.956 / 0.953],
-    [Step], [Spiral],  [0.608], [0.610], [0.600 / 0.605],
-
-    [Sigmoid], [Circles], [0.761], [0.764], [0.756 / 0.760],
-    [Sigmoid], [XOR],     [0.658], [0.661], [0.650 / 0.655],
-    [Sigmoid], [Blobs],   [0.961], [0.961], [0.961 / 0.961],
-    [Sigmoid], [Spiral],  [0.628], [0.631], [0.617 / 0.624],
+    [*Модель*], [*Распределение*], [*Accuracy*], [*Precision*], [*Recall*], [*F1*],
+    [Step], [Circles], [0.492], [0.490], [0.548], [0.517],
+    [Step], [XOR],     [0.497], [0.475], [0.500], [0.487],
+    [Step], [Blobs],   [1.000], [1.000], [1.000], [1.000],
+    [Step], [Spiral],  [0.544], [0.571], [0.435], [0.494],
+    [Sigmoid], [Circles], [0.508], [0.505], [0.536], [0.520],
+    [Sigmoid], [XOR],     [0.564], [0.532], [0.733], [0.617],
+    [Sigmoid], [Blobs],   [1.000], [1.000], [1.000], [1.000],
+    [Sigmoid], [Spiral],  [0.561], [0.571], [0.571], [0.571],
   ),
   caption: [Сравнение качества классификации на test-выборке.],
 )
 
-== 3.5 Сравнение двух моделей
+== Сравнение двух моделей
 
 #figure(
   table(
@@ -535,22 +617,22 @@ def split_data(x, y, test_ratio=0.3, seed=42):
     stroke: 0.5pt,
     fill: (col, row) => if row == 0 { luma(220) } else { white },
     [*Распределение*], [*Step: время, с*], [*Sigmoid: время, с*], [*Вывод*],
-
-    [Circles], [0.012], [0.044], [Сигмоида точнее, но обучается дольше],
-    [XOR],     [0.011], [0.043], [Обе модели ограничены линейностью],
-    [Blobs],   [0.009], [0.039], [Обе модели эффективны; Step быстрее],
-    [Spiral],  [0.013], [0.046], [Качество ограничено, нужен MLP],
+    [Circles], [1.070], [0.012], [Сигмоида точнее, а Step медленнее из-за не-сходимости],
+    [XOR],     [1.087], [0.012], [Обе модели ограничены линейностью],
+    [Blobs],   [0.001], [0.012], [Обе модели эффективны; Step сходится быстро],
+    [Spiral],  [1.061], [0.012], [Качество ограничено, нужен MLP],
   ),
   caption: [Сравнение времени обучения и итогового качества.],
 )
 
 Итог сравнения:
-
-- Ступенчатый перцептрон обучается быстрее и корректно работает на
-  линейно разделимых данных.
-- Сигмоидальная версия обычно даёт немного более стабильное качество,
-  но медленнее по времени обучения.
-- На XOR, circles и spiral обе версии ограничены линейной границей.
+- Ступенчатый перцептрон на нелинейных данных не сходится и
+  проходит все эпохи (+-1с), тогда как сигмоида обучается стабильно
+  быстро (+-0.012с) за счёт непрерывного градиента.
+- На линейно разделимых данных (Blobs) Step сходится досрочно
+  за 0.001с и даёт идеальный результат.
+- На XOR, Circles и Spiral обе версии ограничены линейной
+  границей — точность близка к случайному угадыванию (+-0.5).
 
 // ─────────────────────────────────────────────────────────
 // 5. Выводы
@@ -582,43 +664,40 @@ test.
 // ─────────────────────────────────────────────────────────
 = Структура проекта
 
-Рекомендуемая структура файлов для выполнения задания 2:
+Проект организован по модульному принципу для удобства разработки и
+поддержки:
 
 ```text
 SMGMO/
 ├── lab2/
-│   ├── main.typ                # отчёт (Typst)
-│   ├── generators.py           # make_circles, make_xor, make_blobs, make_spiral
-│   ├── perceptron.py           # класс Perceptron
-│   ├── metrics_utils.py        # confusion matrix, classification report
-│   ├── run_experiments.py      # запуск экспериментов по всем распределениям
-│   ├── circles.png             # визуализация circles
-│   ├── xor.png                 # визуализация xor
-│   ├── blobs.png               # визуализация blobs
-│   └── spiral.png              # визуализация spiral
+│   ├── main.typ                    # отчёт (Typst)
+│   ├── config.py                   # общие параметры экспериментов
+│   ├── generators.py               # генераторы circles, xor, blobs, spiral
+│   ├── perceptron.py               # элементарный перцептрон и метрики
+│   ├── block1_main.py              # визуализация выборок
+│   ├── block2_main.py              # обучение и сравнение перцептрона
+│   ├── gui_launcher.py             # графический запуск блоков
+│   ├── task2_block1_circles.png    # выборка circles
+│   ├── task2_block1_xor.png        # выборка xor
+│   ├── task2_block1_blobs.png      # выборка blobs
+│   ├── task2_block1_spiral.png     # выборка spiral
+│   ├── task2_block2_boundaries.png # границы решений (блок 2)
+│   ├── task2_block2_cm.png         # матрицы ошибок (блок 2)
+│   ├── matrix.png                  # схема интерпретации confusion matrix
+│   ├── overfitting_citcles.png     # скриншот переобучения circles
+│   ├── overfitting_xor.png         # скриншот переобучения xor
+│   ├── overfitting_blobs.png       # скриншот переобучения blobs
+│   └── overfitting_spiral.png      # скриншот переобучения spiral
 └── ...
 ```
 
 // ─────────────────────────────────────────────────────────
-// 7. Приложение: параметры playground
+// 7. Репозиторий
 // ─────────────────────────────────────────────────────────
-= Приложение: параметры экспериментов в playground.tensorflow.org
+= Репозиторий
 
-#figure(
-  table(
-    columns: (auto, auto, auto, auto, auto, auto),
-    align: center,
-    stroke: 0.5pt,
-    fill: (col, row) => if row == 0 { luma(220) } else { white },
-    [*Dataset*], [*Layers*], [*Activation*], [*Train size*], [*Noise*], [*Комментарий*],
-    [Circles], [8-8-8], [tanh], [10%], [8%], [переобучение выражено],
-    [XOR],     [10-10-10], [relu], [10%], [12%], [сложная граница],
-    [Blobs],   [12-12-12], [tanh], [5%], [15%], [запоминание флуктуаций],
-    [Spiral],  [16-16-16], [tanh], [10%], [10%], [максимальный разрыв train/test],
-  ),
-  caption: [Пример конфигураций, при которых наблюдается переобучение.],
-)
-
-В отчёт могут быть добавлены скриншоты из playground для каждого случая
-(граница классов, кривые loss, значения train/test-loss в конце
-обучения).
+Исходный код проекта доступен на GitHub: #link("https://github.com/Q1zin/SMGMO.git")[
+    #text(size: 12pt, fill: blue)[
+      https://github.com/Q1zin/SMGMO.git
+    ]
+  ]
