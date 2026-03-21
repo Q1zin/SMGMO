@@ -139,9 +139,9 @@ $ Delta w_tilde = eta dot y_tilde dot x_tilde, quad y_tilde = 2y - 1. $
 2) *Сигмоида*
 $ phi_sigma(a) = 1 / (1 + e^(-a)). $
 
-Для неё применяется градиентный спуск с обратным распространением
-ошибки при функции потерь
-$E = (y - y_hat)^2$.
+Для неё применяется градиентный спуск. В качестве функции потерь
+используется *бинарная кросс-энтропия* (BCE):
+$ L = -frac(1, N) sum_(i=1)^N [y^((i)) log(hat(y)^((i))) + (1 - y^((i))) log(1 - hat(y)^((i)))]. $
 
 Ключевое ограничение: элементарный перцептрон — линейный классификатор.
 Он хорошо работает на линейно разделимых данных и ограничен на XOR,
@@ -158,7 +158,7 @@ circles и spiral без нелинейного преобразования п�
 
 == Общие параметры генерации
 
-- Размер полной выборки: по умолчанию $N = 200$;
+- Размер полной выборки: по умолчанию $N = 1200$;
 - Разбиение: $70%$ train, $30%$ test;
 - Шум по признакам: $epsilon ~ cal(N)(0, sigma^2 I_2)$,
   по умолчанию используется `noise = 0.8`;
@@ -221,7 +221,7 @@ def make_circles(n=200, noise=None, factor=0.45, seed=42):
 
 #figure(
   image("task2_block1_circles.png", width: 70%),
-  caption: [Распределение circles: внутренняя окружность — класс 0, внешняя — класс 1, $N = 200$.],
+  caption: [Распределение circles: внутренняя окружность — класс 0, внешняя — класс 1, $N = 1200$.],
 )
 
 *Переобучение в playground.tensorflow.org (пример настройки):*
@@ -264,7 +264,7 @@ def make_xor(n=200, noise=None, seed=42):
 
 #figure(
   image("task2_block1_xor.png", width: 70%),
-  caption: [Распределение XOR: четыре кластера, метки по правилу $x_1 x_2 < 0$, $N = 200$.],
+  caption: [Распределение XOR: четыре кластера, метки по правилу $x_1 x_2 < 0$, $N = 1200$.],
 )
 
 *Переобучение (пример настройки playground):*
@@ -308,7 +308,7 @@ def make_blobs(n=200, noise=None, seed=42):
 
 #figure(
   image("task2_block1_blobs.png", width: 70%),
-  caption: [Распределение blobs: два гауссовских кластера, $N = 200$.],
+  caption: [Распределение blobs: два гауссовских кластера, $N = 1200$.],
 )
 
 *Переобучение (пример настройки playground):*
@@ -345,10 +345,10 @@ def make_spiral(n=200, noise=None, turns=2.5, seed=42):
     r1 = max_radius * t1 / (turns * np.pi)
     r2 = max_radius * t2 / (turns * np.pi)
 
-    x1 = np.c_[r1 * np.cos(t1), r1 * np.sin(t1)]
-    x2 = np.c_[r2 * np.cos(t2 + np.pi), r2 * np.sin(t2 + np.pi)]
+    s1 = np.c_[r1 * np.cos(t1), r1 * np.sin(t1)]
+    s2 = np.c_[r2 * np.cos(t2 + np.pi), r2 * np.sin(t2 + np.pi)]
 
-    x = np.vstack([x1, x2])
+    x = np.vstack([s1, s2])
     x += rng.normal(0, noise, x.shape)
     x = np.clip(x, -AXIS_LIMIT, AXIS_LIMIT)
     y = np.hstack([np.zeros(n1, dtype=int), np.ones(n2, dtype=int)])
@@ -361,7 +361,7 @@ def make_spiral(n=200, noise=None, turns=2.5, seed=42):
 
 #figure(
   image("task2_block1_spiral.png", width: 70%),
-  caption: [Распределение spiral: две спирали Архимеда, сдвинутые на $pi$, $N = 200$.],
+  caption: [Распределение spiral: две спирали Архимеда, сдвинутые на $pi$, $N = 1200$.],
 )
 
 *Переобучение (пример настройки playground):*
@@ -383,19 +383,156 @@ def make_spiral(n=200, noise=None, turns=2.5, seed=42):
 
 == Математическая модель
 
-Линейная комбинация признаков:
+=== Расширенный входной вектор
 
-$ a = w_0 + w_1 x_1 + w_2 x_2 = w_tilde^T x_tilde. $
+К вектору признаков $x = (x_1, x_2)^T$ слева приписывается фиктивная
+единица, чтобы смещение $w_0$ вошло в единое матричное произведение:
+
+$ tilde(x) = (1, x_1, x_2)^T in RR^3, quad tilde(w) = (w_0, w_1, w_2)^T in RR^3. $
+
+В коде:
+```python
+xb = np.c_[np.ones(len(x)), x]   # (N,2) → (N,3): приписываем x₀=1
+self.w = rng.normal(0, 0.01, 3)  # w = [w₀, w₁, w₂]
+```
+
+=== Прямой проход
+
+Линейная комбинация признаков (один объект):
+
+$ a = tilde(w)^T tilde(x) = w_0 dot 1 + w_1 x_1 + w_2 x_2. $
+
+Для всей выборки $(N$ объектов$)$ сразу — матрично:
+
+$ bold(a) = tilde(X) tilde(w), quad tilde(X) in RR^(N times 3). $
+
+В коде:
+```python
+a_vec = xb @ self.w   # (N,3)·(3,) = (N,) — все aᵢ за одну операцию
+```
 
 Выход модели:
 
-$ y_hat = phi(a). $
+$ hat(y) = phi(a). $
 
-Для ступенчатой активации решение принимается по знаку $a$.
-Для сигмоиды $y_hat in (0, 1)$, а класс определяется порогом
-$0.5$.
+=== Алгоритм 1: ступенчатая функция (правило Розенблатта)
 
-== Код реализации
+Функция активации:
+
+$ phi_"step"(a) = cases(1 & "если" a >= 0, 0 & "если" a < 0.) $
+
+Поскольку $phi_"step"$ недифференцируема, градиентный спуск неприменим.
+Используется *правило коррекции ошибок* (теорема Новикова—Розенблатта):
+если предсказание неверно, веса корректируются в сторону правильного класса.
+
+Метки перекодируются: $tilde(y) = 2y - 1 in {-1, +1}$, чтобы поправка имела
+правильный знак при любом исходе.
+
+*Правило обновления* (только при ошибке, $hat(y) != y$):
+
+$ tilde(w) <- tilde(w) + eta dot tilde(y) dot tilde(x), $
+
+что компонентно означает:
+
+$ w_j <- w_j + eta dot tilde(y) dot x_j, quad j = 0, 1, 2. $
+
+- $tilde(y) = +1$ (истина — класс 1, предсказан 0): вес сдвигается в плюс, $a$ вырастет и следующий раз, возможно, станет $>= 0$.
+- $tilde(y) = -1$ (истина — класс 0, предсказан 1): вес сдвигается в минус.
+
+*Критерий останова:* если за целую эпоху ни одного исправления — все
+объекты классифицированы корректно, обучение завершается досрочно.
+Для линейно разделимых данных сходимость гарантируется теоремой.
+
+В коде:
+```python
+y_norm = 2 * y - 1                        # {0,1} → {-1,+1}
+
+for _ in range(self.n_epochs):
+    changed = False
+    for i in range(len(xb)):
+        pred = 1 if (xb[i] @ self.w) >= 0 else 0   # ŷᵢ = φ(aᵢ)
+        if pred != y[i]:                             # ошибка?
+            self.w += self.lr * y_norm[i] * xb[i]   # w += η·ỹ·x̃
+            changed = True
+    if not changed:
+        break                             # сошлись — выходим
+```
+
+=== Алгоритм 2: сигмоида + градиентный спуск (BCE)
+
+*Функция активации* — сигмоида, выход интерпретируется как вероятность
+класса 1:
+
+$ hat(y) = sigma(a) = frac(1, 1 + e^(-a)) in (0, 1). $
+
+В коде:
+```python
+def _sigmoid(self, a):
+    return 1.0 / (1.0 + np.exp(-np.clip(a, -500, 500)))
+```
+
+*Функция потерь* — бинарная кросс-энтропия (BCE), усреднённая по батчу:
+
+$ L = -frac(1, N) sum_(i=1)^N [y^((i)) log hat(y)^((i)) + (1 - y^((i))) log(1 - hat(y)^((i)))]. $
+
+В коде:
+```python
+yh_clip = np.clip(yh, 1e-15, 1 - 1e-15)
+loss = -np.mean(y * np.log(yh_clip) + (1 - y) * np.log(1 - yh_clip))
+```
+
+*Обратный проход.* По правилу цепочки:
+
+$ frac(partial L, partial w_i)
+  = underbrace(frac(partial L, partial hat(y)))_(-y slash hat(y) + (1-y) slash (1-hat(y)))
+  dot underbrace(frac(partial hat(y), partial a))_(hat(y)(1-hat(y)))
+  dot underbrace(frac(partial a, partial w_i))_(x_i). $
+
+Первые два множителя сокращаются:
+
+$ frac(partial L, partial hat(y)) dot frac(partial hat(y), partial a)
+  = frac(hat(y) - y, cancel(hat(y)(1-hat(y)))) dot cancel(hat(y)(1-hat(y)))
+  = hat(y) - y. $
+
+Итоговый градиент по всей выборке:
+
+$ nabla_w L = frac(1, N) tilde(X)^T (hat(y) - y). $
+
+*Обновление весов:*
+
+$ tilde(w) <- tilde(w) - eta nabla_w L = tilde(w) - frac(eta, N) tilde(X)^T (hat(y) - y). $
+
+В коде:
+```python
+yh    = self._sigmoid(xb @ self.w)  # ŷ = σ(X̃w),  форма (N,)
+delta = yh - y                      # ∂L/∂a = ŷ-y, форма (N,)
+grad  = (xb.T @ delta) / len(xb)    # ∇wL = X̃ᵀδ/N, форма (3,)
+self.w -= self.lr * grad            # w ← w - η·∇wL
+```
+
+=== Предсказание и разделяющая граница
+
+После обучения класс определяется по знаку линейной комбинации:
+
+$ hat(y) = cases(
+  1 & "если" tilde(w)^T tilde(x) >= 0,
+  0 & "иначе".
+) $
+
+Разделяющая прямая $tilde(w)^T tilde(x) = 0$ выражается явно через $x_2$:
+
+$ w_0 + w_1 x_1 + w_2 x_2 = 0 quad => quad x_2 = -frac(w_0 + w_1 x_1, w_2). $
+
+В коде:
+```python
+def boundary_x2(self, x1):
+    w0, w1, w2 = self.w
+    if abs(w2) < 1e-8:
+        return None             # граница вертикальна
+    return -(w0 + w1 * x1) / w2
+```
+
+== Полный листинг класса `Perceptron`
 
 ```python
 import numpy as np
@@ -403,39 +540,51 @@ import time
 
 class Perceptron:
     def __init__(self, activation='step', lr=0.1, n_epochs=300, seed=42):
-        self.activation = activation
-        self.lr = lr
-        self.n_epochs = n_epochs
+        self.activation = activation  # 'step' или 'sigmoid'
+        self.lr = lr                  # η — шаг обучения
+        self.n_epochs = n_epochs      # максимум эпох
         self.seed = seed
-        self.w = None
+        self.w = None                 # [w₀, w₁, w₂] — инициализируется в fit
         self.train_time = 0.0
+        self.loss_history = []        # история BCE (только для sigmoid)
 
     def _sigmoid(self, a):
+        # σ(a) = 1 / (1 + e^{-a}), clip защищает от overflow
         return 1.0 / (1.0 + np.exp(-np.clip(a, -500, 500)))
 
     def fit(self, x, y):
         rng = np.random.default_rng(self.seed)
-        xb = np.c_[np.ones(len(x)), x]
-        self.w = rng.normal(0, 0.01, xb.shape[1])
-        y_norm = 2 * y - 1
+        xb = np.c_[np.ones(len(x)), x]          # x̃: приписываем x₀=1 → (N,3)
+        self.w = rng.normal(0, 0.01, xb.shape[1])  # w ~ N(0, 0.01), форма (3,)
+        y_norm = 2 * y - 1                       # {0,1} → {-1,+1} для step
+
         t0 = time.perf_counter()
 
         if self.activation == 'step':
+            # ── Алгоритм Розенблатта ─────────────────────────────────────
             for _ in range(self.n_epochs):
                 changed = False
                 for i in range(len(xb)):
-                    pred = 1 if (xb[i] @ self.w) >= 0 else 0
-                    if pred != y[i]:
-                        self.w += self.lr * y_norm[i] * xb[i]
+                    pred = 1 if (xb[i] @ self.w) >= 0 else 0    # ŷ = φ(aᵢ)
+                    if pred != y[i]:                            # ошибка?
+                        self.w += self.lr * y_norm[i] * xb[i]   # w += η·ỹ·x̃
                         changed = True
                 if not changed:
-                    break
+                    break                         # сошлись досрочно
         else:
+            # ── Градиентный спуск с BCE ──────────────────────────────────
+            self.loss_history = []
+            eps = 1e-15
             for _ in range(self.n_epochs):
-                yh = self._sigmoid(xb @ self.w)
-                delta = -2.0 * (y - yh) * yh * (1.0 - yh)
-                grad = (delta @ xb) / len(xb)
-                self.w -= self.lr * grad
+                yh = self._sigmoid(xb @ self.w)              # ŷ = σ(X̃w)
+                yh_clip = np.clip(yh, eps, 1 - eps)
+                loss = -np.mean(                             # L = BCE(ŷ, y)
+                    y * np.log(yh_clip) + (1 - y) * np.log(1 - yh_clip)
+                )
+                self.loss_history.append(loss)
+                delta = yh - y                               # ∂L/∂a = ŷ - y
+                grad  = (xb.T @ delta) / len(xb)            # ∇wL = X̃ᵀδ / N
+                self.w -= self.lr * grad                     # w ← w - η·∇wL
 
         self.train_time = time.perf_counter() - t0
 
@@ -461,12 +610,12 @@ class Perceptron:
     node((0,4), $1$),
     node((2,2), $a$),
     node((4,2), $hat(y)$),
-    node((6,2), $E$),
+    node((6,2), $L$),
     edge((0,0), (2,2), $w_1$, "->"),
     edge((0,2), (2,2), $w_2$, "->"),
     edge((0,4), (2,2), $w_0$, "->"),
     edge((2,2), (4,2), $sigma(dot)$, "->"),
-    edge((4,2), (6,2), "->"),
+    edge((4,2), (6,2), $"BCE"(dot,y)$, "->"),
   ),
   caption: [Вычислительный граф элементарного перцептрона.],
 )
@@ -485,28 +634,36 @@ class Perceptron:
    $ hat(y) = sigma(a) = frac(1, 1 + e^(-a)). $
    Выход $hat(y) in (0, 1)$ интерпретируется как вероятность класса $1$.
 
-4. *Функция потерь.* В узле $E$ вычисляется квадратичная ошибка:
-   $ E = (y - hat(y))^2. $
+4. *Функция потерь.* В узле $L$ вычисляется бинарная кросс-энтропия:
+   $ L = -[y log(hat(y)) + (1 - y) log(1 - hat(y))]. $
+   В отличие от MSE, BCE обеспечивает более сильный градиентный сигнал
+   при уверенных ошибках и является стандартной функцией потерь для
+   бинарной классификации с сигмоидой.
 
-При *обратном проходе* ошибка $E$ распространяется по тем же рёбрам
+При *обратном проходе* ошибка $L$ распространяется по тем же рёбрам
 справа налево. По правилу цепочки на каждом ребре перемножаются
 локальные производные — это и есть алгоритм backpropagation.
 
 Локальные производные:
 
-$ (partial E)/(partial y_hat) = -2(y - y_hat), $
+$ (partial L)/(partial hat(y)) = -y / hat(y) + (1 - y) / (1 - hat(y)), $
 
-$ (partial y_hat)/(partial a) = y_hat(1 - y_hat), $
+$ (partial hat(y))/(partial a) = hat(y)(1 - hat(y)), $
 
 $ (partial a)/(partial w_i) = x_i. $
 
+Произведение первых двух множителей упрощается (сокращение $hat(y)(1-hat(y))$):
+
+$ (partial L)/(partial a) = (partial L)/(partial hat(y)) dot (partial hat(y))/(partial a)
+  = lr((-frac(y, hat(y)) + frac(1-y, 1-hat(y)))) dot hat(y)(1-hat(y)) = hat(y) - y. $
+
 По правилу цепочки:
 
-$ (partial E)/(partial w_i) = (partial E)/(partial y_hat) dot (partial y_hat)/(partial a) dot (partial a)/(partial w_i) = -2(y - y_hat) y_hat(1 - y_hat) x_i. $
+$ (partial L)/(partial w_i) = (hat(y) - y) x_i. $
 
-Обновление весов:
+Обновление весов (усреднение по батчу из $N$ объектов):
 
-$ w_i <- w_i - eta (partial E)/(partial w_i). $
+$ w <- w - frac(eta, N) X^T (hat(y) - y). $
 
 Для ступенчатой функции производная не определена в нуле и равна нулю
 почти всюду, поэтому используется не backprop, а правило коррекции
@@ -560,12 +717,12 @@ def split_data(x, y, test_ratio=0.3, seed=42):
     [*Модель*], [*Распределение*], [*TN*], [*FP*], [*FN*], [*TP*],
     [Step], [Circles], [79],  [102], [81], [98],
     [Step], [XOR],     [93],  [95],  [86], [86],
-    [Step], [Blobs],   [176], [0],   [0], [184],
-    [Step], [Spiral],  [116], [60],  [104], [80],
-    [Sigmoid], [Circles], [87],  [94],  [83], [96],
-    [Sigmoid], [XOR],     [77],  [111], [46], [126],
-    [Sigmoid], [Blobs],   [176], [0],   [0], [184],
-    [Sigmoid], [Spiral],  [97],  [79],  [79], [105],
+    [Step], [Blobs],   [176], [0],   [0],  [184],
+    [Step], [Spiral],  [116], [60],  [104],[80],
+    [Sigmoid], [Circles], [85],  [96],  [82], [97],
+    [Sigmoid], [XOR],     [76],  [112], [48], [124],
+    [Sigmoid], [Blobs],   [176], [0],   [0],  [184],
+    [Sigmoid], [Spiral],  [98],  [78],  [80], [104],
   ),
   caption: [Матрицы ошибок (сводные значения по test-выборке).],
 )
@@ -609,10 +766,10 @@ def split_data(x, y, test_ratio=0.3, seed=42):
     [Step], [XOR],     [0.497], [0.475], [0.500], [0.487],
     [Step], [Blobs],   [1.000], [1.000], [1.000], [1.000],
     [Step], [Spiral],  [0.544], [0.571], [0.435], [0.494],
-    [Sigmoid], [Circles], [0.508], [0.505], [0.536], [0.520],
-    [Sigmoid], [XOR],     [0.564], [0.532], [0.733], [0.617],
+    [Sigmoid], [Circles], [0.506], [0.503], [0.542], [0.522],
+    [Sigmoid], [XOR],     [0.556], [0.525], [0.721], [0.608],
     [Sigmoid], [Blobs],   [1.000], [1.000], [1.000], [1.000],
-    [Sigmoid], [Spiral],  [0.561], [0.571], [0.571], [0.571],
+    [Sigmoid], [Spiral],  [0.561], [0.571], [0.565], [0.568],
   ),
   caption: [Сравнение качества классификации на test-выборке.],
 )
@@ -626,10 +783,10 @@ def split_data(x, y, test_ratio=0.3, seed=42):
     stroke: 0.5pt,
     fill: (col, row) => if row == 0 { luma(220) } else { white },
     [*Распределение*], [*Step: время, с*], [*Sigmoid: время, с*], [*Вывод*],
-    [Circles], [1.070], [0.012], [Сигмоида точнее, а Step медленнее из-за не-сходимости],
-    [XOR],     [1.087], [0.012], [Обе модели ограничены линейностью],
-    [Blobs],   [0.001], [0.012], [Обе модели эффективны; Step сходится быстро],
-    [Spiral],  [1.061], [0.012], [Качество ограничено, нужен MLP],
+    [Circles], [1.136], [0.026], [Сигмоида точнее, а Step медленнее из-за не-сходимости],
+    [XOR],     [1.112], [0.025], [Обе модели ограничены линейностью],
+    [Blobs],   [0.001], [0.028], [Обе модели эффективны; Step сходится быстро],
+    [Spiral],  [1.135], [0.026], [Качество ограничено, нужен MLP],
   ),
   caption: [Сравнение времени обучения и итогового качества.],
 )

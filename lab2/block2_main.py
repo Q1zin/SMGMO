@@ -39,13 +39,13 @@ def train_all():
             model.fit(x_tr, y_tr)
             y_pred = model.predict(x_te)
             results[act].append({
-                'name':  ds_name,
-                'x':     x,
-                'x_te':  x_te,
-                'y_te':  y_te,
+                'name': ds_name,
+                'x': x,
+                'x_te': x_te,
+                'y_te': y_te,
                 'model': model,
-                'cm':    confusion_matrix(y_te, y_pred),
-                'acc':   accuracy(y_te, y_pred),
+                'cm': confusion_matrix(y_te, y_pred),
+                'acc': accuracy(y_te, y_pred),
             })
     return results
 

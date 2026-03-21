@@ -9,6 +9,7 @@ class Perceptron:
         self.seed = seed
         self.w = None
         self.train_time = 0.0
+        self.loss_history = []
 
     def _sigmoid(self, a):
         return 1.0 / (1.0 + np.exp(-np.clip(a, -500, 500)))
@@ -32,10 +33,15 @@ class Perceptron:
                 if not changed:
                     break
         else:
+            self.loss_history = []
+            eps = 1e-15
             for _ in range(self.n_epochs):
                 yh = self._sigmoid(xb @ self.w)
-                delta = -2.0 * (y - yh) * yh * (1.0 - yh)
-                grad = (delta @ xb) / len(xb)
+                yh_clip = np.clip(yh, eps, 1 - eps)
+                loss = -np.mean(y * np.log(yh_clip) + (1 - y) * np.log(1 - yh_clip))
+                self.loss_history.append(loss)
+                delta = yh - y
+                grad = (xb.T @ delta) / len(xb)
                 self.w -= self.lr * grad
 
         self.train_time = time.perf_counter() - t0
