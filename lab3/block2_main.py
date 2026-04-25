@@ -1,29 +1,15 @@
-"""
-Задание 3 — Блок 2: Классификация MLP + оценка размера выборки + кросс-валидация.
-
-1. Перебор архитектур (активация × слои × нейроны) на 4 датасетах.
-2. Оценка минимального размера обучающей выборки для accuracy >= 90 %.
-3. 5-fold кросс-валидация для выбора лучшей активации и числа слоёв.
-"""
-
 import copy
 import itertools
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
 
-from config import (SEED, CLS_N, CLS_NOISE, CLS_EPOCHS, CLS_LR,
-                    CV_K, DPI)
-from generators import (CLS_DATASETS, make_circles, make_xor,
-                         make_blobs, make_spiral,
-                         train_test_split, standardize)
-from mlp import (build_mlp, train_model, predict_classes,
-                 classification_metrics, to_tensor)
+from config import (SEED, CLS_N, CLS_NOISE, CLS_EPOCHS, CLS_LR, CV_K, DPI)
+from generators import (CLS_DATASETS, make_circles, make_xor, make_blobs, make_spiral, train_test_split, standardize)
+from mlp import (build_mlp, train_model, predict_classes, classification_metrics, to_tensor)
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Подготовка датасетов
-# ═══════════════════════════════════════════════════════════════════
+IMG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
 
 def load_cls_datasets(n=CLS_N, noise=CLS_NOISE):
     return [
@@ -37,13 +23,7 @@ def load_cls_datasets(n=CLS_N, noise=CLS_NOISE):
          'data': make_spiral(n=n, noise=noise, seed=24)},
     ]
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Перебор архитектур
-# ═══════════════════════════════════════════════════════════════════
-
-def run_classification_experiments(datasets, activations=('sigmoid', 'tanh', 'relu'),
-                                   epochs=CLS_EPOCHS, lr=CLS_LR):
+def run_classification_experiments(datasets, activations=('sigmoid', 'tanh', 'relu'), epochs=CLS_EPOCHS, lr=CLS_LR):
     rows = []
     best_models = {}
     archs = list(itertools.product([1, 2, 3], [1, 2, 3, 4, 5]))
@@ -63,8 +43,7 @@ def run_classification_experiments(datasets, activations=('sigmoid', 'tanh', 're
             best = None
             for h_layers, h_dim in archs:
                 model = build_mlp(2, 2, h_layers, h_dim, act)
-                hist = train_model(model, X_tr_t, y_tr_t, X_te_t, y_te_t,
-                                   task='classification', epochs=epochs, lr=lr)
+                hist = train_model(model, X_tr_t, y_tr_t, X_te_t, y_te_t, task='classification', epochs=epochs, lr=lr)
                 pred = predict_classes(model, X_te_t)
                 metrics = classification_metrics(y_te, pred)
 
@@ -88,14 +67,8 @@ def run_classification_experiments(datasets, activations=('sigmoid', 'tanh', 're
 
     return rows, best_models
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Сводная таблица (accuracy)
-# ═══════════════════════════════════════════════════════════════════
-
 def print_cls_pivot(rows, ds_name, act):
-    subset = [r for r in rows
-              if r['dataset'] == ds_name and r['activation'] == act]
+    subset = [r for r in rows if r['dataset'] == ds_name and r['activation'] == act]
     all_layers = sorted({r['linear_layers'] for r in subset})
     all_dims = sorted({r['hidden_dim'] for r in subset})
 
@@ -106,17 +79,11 @@ def print_cls_pivot(rows, ds_name, act):
     for nl in all_layers:
         line = f'{nl:<8}'
         for hd in all_dims:
-            val = next((r['test_accuracy'] for r in subset
-                        if r['linear_layers'] == nl and r['hidden_dim'] == hd), None)
+            val = next((r['test_accuracy'] for r in subset if r['linear_layers'] == nl and r['hidden_dim'] == hd), None)
             line += f'{val:<{col_w}.4f}' if val is not None else f'{"—":<{col_w}}'
         print(line)
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Визуализация лучших моделей (boundary + confusion matrix)
-# ═══════════════════════════════════════════════════════════════════
-
-def plot_decision_boundary(record):
+def plot_decision_boundary(record, save_path=None):
     model = record['model']
     X_tr, X_te = record['X_train'], record['X_test']
     y_tr, y_te = record['y_train'], record['y_test']
@@ -126,8 +93,7 @@ def plot_decision_boundary(record):
     lo = X_all.min(axis=0) - 0.5
     hi = X_all.max(axis=0) + 0.5
 
-    xx, yy = np.meshgrid(np.linspace(lo[0], hi[0], 250),
-                         np.linspace(lo[1], hi[1], 250))
+    xx, yy = np.meshgrid(np.linspace(lo[0], hi[0], 250), np.linspace(lo[1], hi[1], 250))
     grid = np.column_stack([xx.ravel(), yy.ravel()])
     grid_s = (grid - x_m) / x_s
     zz = predict_classes(model, to_tensor(grid_s)).reshape(xx.shape)
@@ -165,17 +131,13 @@ def plot_decision_boundary(record):
     axes[2].set_title('Confusion matrix')
 
     plt.tight_layout()
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, dpi=DPI, bbox_inches='tight')
     plt.show()
     plt.close()
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Часть II.1 — Оценка минимального размера выборки
-# ═══════════════════════════════════════════════════════════════════
-
-def estimate_min_train_size(datasets, activation='tanh', linear_layers=4,
-                            hidden_dim=5, target_acc=0.90,
-                            epochs=CLS_EPOCHS, lr=CLS_LR):
+def estimate_min_train_size(datasets, activation='tanh', linear_layers=4, hidden_dim=5, target_acc=0.90, epochs=CLS_EPOCHS, lr=CLS_LR):
     fracs = np.arange(0.10, 0.96, 0.05)
     summary = []
 
@@ -188,15 +150,11 @@ def estimate_min_train_size(datasets, activation='tanh', linear_layers=4,
         best_frac = None
         for frac in fracs:
             test_ratio = 1.0 - float(frac)
-            X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_ratio=test_ratio,
-                                                       seed=SEED)
+            X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_ratio=test_ratio, seed=SEED)
             X_tr_s, X_te_s, _, _ = standardize(X_tr, X_te)
 
             model = build_mlp(2, 2, linear_layers - 1, hidden_dim, activation)
-            train_model(model,
-                        to_tensor(X_tr_s), to_tensor(y_tr, torch.long),
-                        to_tensor(X_te_s), to_tensor(y_te, torch.long),
-                        task='classification', epochs=epochs, lr=lr)
+            train_model(model, to_tensor(X_tr_s), to_tensor(y_tr, torch.long), to_tensor(X_te_s), to_tensor(y_te, torch.long), task='classification', epochs=epochs, lr=lr)
 
             pred = predict_classes(model, to_tensor(X_te_s))
             acc = classification_metrics(y_te, pred)['accuracy']
@@ -209,26 +167,17 @@ def estimate_min_train_size(datasets, activation='tanh', linear_layers=4,
             'linear_layers': linear_layers, 'hidden_dim': hidden_dim,
             'target_acc': target_acc,
             'min_frac': best_frac,
-            'min_train_size': (None if best_frac is None
-                               else int(round(best_frac * len(X)))),
+            'min_train_size': (None if best_frac is None else int(round(best_frac * len(X)))),
         })
 
     return summary
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  Часть II.2 — K-fold кросс-валидация
-# ═══════════════════════════════════════════════════════════════════
 
 def kfold_indices(n, k=5, seed=SEED):
     rng = np.random.default_rng(seed)
     idx = rng.permutation(n)
     return np.array_split(idx, k)
 
-
-def cv_grid_search(X, y, activations=('sigmoid', 'tanh', 'relu'),
-                   layers_grid=(2, 3, 4), hidden_dim=5,
-                   k=CV_K, epochs=CLS_EPOCHS, lr=CLS_LR):
+def cv_grid_search(X, y, activations=('sigmoid', 'tanh', 'relu'), layers_grid=(2, 3, 4), hidden_dim=5, k=CV_K, epochs=CLS_EPOCHS, lr=CLS_LR):
     X = np.asarray(X, dtype=np.float32)
     y = np.asarray(y, dtype=np.int64)
     folds = kfold_indices(len(X), k=k)
@@ -249,10 +198,7 @@ def cv_grid_search(X, y, activations=('sigmoid', 'tanh', 'relu'),
                 X_tr_s, X_val_s, _, _ = standardize(X_tr, X_val)
 
                 model = build_mlp(2, 2, nl - 1, hidden_dim, act)
-                train_model(model,
-                            to_tensor(X_tr_s), to_tensor(y_tr, torch.long),
-                            to_tensor(X_val_s), to_tensor(y_val, torch.long),
-                            task='classification', epochs=epochs, lr=lr)
+                train_model(model, to_tensor(X_tr_s), to_tensor(y_tr, torch.long), to_tensor(X_val_s), to_tensor(y_val, torch.long), task='classification', epochs=epochs, lr=lr)
 
                 pred = predict_classes(model, to_tensor(X_val_s))
                 fold_accs.append(classification_metrics(y_val, pred)['accuracy'])
@@ -261,8 +207,7 @@ def cv_grid_search(X, y, activations=('sigmoid', 'tanh', 'relu'),
                 'activation': act, 'linear_layers': nl,
                 'hidden_dim': hidden_dim,
                 'cv_mean_acc': float(np.mean(fold_accs)),
-                'cv_std_acc': (float(np.std(fold_accs, ddof=1))
-                               if len(fold_accs) > 1 else 0.0),
+                'cv_std_acc': (float(np.std(fold_accs, ddof=1)) if len(fold_accs) > 1 else 0.0),
             }
             rows.append(row)
             if best_row is None or row['cv_mean_acc'] > best_row['cv_mean_acc']:
@@ -270,15 +215,10 @@ def cv_grid_search(X, y, activations=('sigmoid', 'tanh', 'relu'),
 
     return rows, best_row
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  main
-# ═══════════════════════════════════════════════════════════════════
-
 def main():
     datasets = load_cls_datasets()
 
-    # ── 1. Визуализация датасетов ──
+    # Визуализация датасетов
     fig, axes = plt.subplots(2, 2, figsize=(10, 10))
     fig.suptitle('Классификационные выборки', fontsize=14, fontweight='bold')
     for ax, ds in zip(axes.flat, datasets):
@@ -290,10 +230,12 @@ def main():
         ax.grid(True, alpha=0.3)
         ax.set_aspect('equal', adjustable='box')
     plt.tight_layout()
+    os.makedirs(IMG_DIR, exist_ok=True)
+    fig.savefig(os.path.join(IMG_DIR, 'cls_datasets.png'), dpi=DPI, bbox_inches='tight')
     plt.show()
     plt.close()
 
-    # ── 2. Перебор архитектур ──
+    # Перебор архитектур
     print(f'\nПеребор архитектур (epochs={CLS_EPOCHS}, lr={CLS_LR})…')
     rows, best = run_classification_experiments(datasets)
 
@@ -312,9 +254,9 @@ def main():
         print(f'  {ds_name} | {act}: '
               f'слоёв={rec["linear_layers"]}, нейронов={rec["hidden_dim"]}, '
               f'acc={rec["test_accuracy"]:.4f}')
-        plot_decision_boundary(rec)
+        plot_decision_boundary(rec, save_path=os.path.join(IMG_DIR, f'cls_{ds_name.lower()}_{act}.png'))
 
-    # ── 3. Минимальный размер выборки ──
+    # Минимальный размер выборки
     print('\n── Минимальный размер выборки для accuracy >= 90 % ──')
     size_summary = estimate_min_train_size(datasets)
     col_w = 14
@@ -330,7 +272,7 @@ def main():
               f"{r['linear_layers']:<{col_w}}{r['hidden_dim']:<{col_w}}"
               f"{r['target_acc']:<{col_w}}{mf:<{col_w}}{ms:<{col_w}}")
 
-    # ── 4. Кросс-валидация ──
+    # Кросс-валидация
     print(f'\n── {CV_K}-fold кросс-валидация ──')
     cv_summary = []
     for ds in datasets:

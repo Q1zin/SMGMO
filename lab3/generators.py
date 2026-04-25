@@ -1,21 +1,5 @@
-"""
-Генерация данных для задания 3.
-
-Регрессия:
-  - случайный полином 3-й степени
-  - осциллирующая функция x·sin(2πx)
-
-Классификация:
-  - Circles, XOR, Blobs, Spiral  (повтор из задания 2)
-"""
-
 import numpy as np
 from config import SEED, AXIS_LIMIT
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  Регрессия
-# ═══════════════════════════════════════════════════════════════════
 
 def random_polynomial(seed=SEED):
     rng = np.random.default_rng(seed)
@@ -26,12 +10,10 @@ def random_polynomial(seed=SEED):
 
     return f, (a, b, c, d)
 
-
 def trig_function():
     def f(x):
         return x * np.sin(2 * np.pi * x)
     return f
-
 
 def generate_noise(n, eps0, mode='uniform', sigma=None, seed=SEED):
     rng = np.random.default_rng(seed)
@@ -43,19 +25,12 @@ def generate_noise(n, eps0, mode='uniform', sigma=None, seed=SEED):
         return rng.normal(0, sigma, n)
     raise ValueError(f'Unknown noise mode: {mode}')
 
-
-def generate_regression_sample(f, n, eps0, noise_mode='uniform',
-                               sigma=None, seed=SEED):
+def generate_regression_sample(f, n, eps0, noise_mode='uniform', sigma=None, seed=SEED):
     rng = np.random.default_rng(seed)
     x = rng.uniform(-1, 1, n)
     noise = generate_noise(n, eps0, mode=noise_mode, sigma=sigma, seed=seed + 1)
     y = f(x) + noise
     return x.reshape(-1, 1), y.reshape(-1, 1)
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  Классификация  (совместимо с lab2/generators.py)
-# ═══════════════════════════════════════════════════════════════════
 
 def make_circles(n=400, noise=0.08, factor=0.35, seed=SEED):
     rng = np.random.default_rng(seed)
@@ -69,8 +44,7 @@ def make_circles(n=400, noise=0.08, factor=0.35, seed=SEED):
     inner = factor * np.column_stack([np.cos(theta_inner), np.sin(theta_inner)])
 
     X = np.vstack([outer, inner])
-    y = np.concatenate([np.zeros(n_outer, dtype=int),
-                        np.ones(n_inner, dtype=int)])
+    y = np.concatenate([np.zeros(n_outer, dtype=int), np.ones(n_inner, dtype=int)])
     if noise > 0:
         X += rng.normal(0, noise, X.shape)
     return X, y
@@ -78,8 +52,7 @@ def make_circles(n=400, noise=0.08, factor=0.35, seed=SEED):
 
 def make_xor(n=400, noise=0.55, scale=2.2, seed=SEED):
     rng = np.random.default_rng(seed)
-    centers = np.array([[scale, scale], [scale, -scale],
-                        [-scale, scale], [-scale, -scale]])
+    centers = np.array([[scale, scale], [scale, -scale], [-scale, scale], [-scale, -scale]])
     per = n // 4
     rem = n % 4
     X_parts, y_parts = [], []
@@ -112,9 +85,7 @@ def make_blobs(n=400, centers=None, cluster_std=0.9, seed=SEED):
     perm = rng.permutation(len(X))
     return X[perm], y[perm]
 
-
-def make_spiral(n=400, turns=1.5, radius=0.08, sweep=0.28,
-                noise=0.08, seed=SEED):
+def make_spiral(n=400, turns=1.5, radius=0.08, sweep=0.28, noise=0.08, seed=SEED):
     rng = np.random.default_rng(seed)
     n0 = n // 2
     n1 = n - n0
@@ -132,7 +103,6 @@ def make_spiral(n=400, turns=1.5, radius=0.08, sweep=0.28,
     perm = rng.permutation(len(X))
     return X[perm], y[perm]
 
-
 CLS_DATASETS = [
     ('Circles', make_circles),
     ('XOR',     make_xor),
@@ -140,23 +110,16 @@ CLS_DATASETS = [
     ('Spiral',  make_spiral),
 ]
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Утилиты
-# ═══════════════════════════════════════════════════════════════════
-
 def train_test_split(X, y, test_ratio=0.25, seed=SEED):
     rng = np.random.default_rng(seed)
     idx = rng.permutation(len(X))
     cut = int(len(X) * (1 - test_ratio))
     return X[idx[:cut]], X[idx[cut:]], y[idx[:cut]], y[idx[cut:]]
 
-
 def standardize(X_train, X_test):
     mean = X_train.mean(axis=0, keepdims=True)
     std = X_train.std(axis=0, keepdims=True) + 1e-8
     return (X_train - mean) / std, (X_test - mean) / std, mean, std
-
 
 def standardize_targets(y_train, y_test):
     mean = y_train.mean(axis=0, keepdims=True)

@@ -1,10 +1,3 @@
-"""
-Многослойный персептрон (MLP) на torch.nn.
-
-Функции активации: Sigmoid, Tanh, ReLU.
-Задачи: регрессия (MSELoss), классификация (CrossEntropyLoss).
-"""
-
 import copy
 import numpy as np
 import torch
@@ -17,24 +10,14 @@ device = torch.device('cpu')
 
 ACTIVATIONS = {
     'sigmoid': nn.Sigmoid,
-    'tanh':    nn.Tanh,
-    'relu':    nn.ReLU,
+    'tanh': nn.Tanh,
+    'relu': nn.ReLU,
 }
-
 
 def to_tensor(array, dtype=torch.float32):
     return torch.tensor(np.asarray(array), dtype=dtype, device=device)
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Построение MLP
-# ═══════════════════════════════════════════════════════════════════
-
 def build_mlp(input_dim, output_dim, hidden_layers, hidden_dim, activation):
-    """
-    hidden_layers — количество скрытых слоёв (без выходного).
-    Число линейных слоёв = hidden_layers + 1.
-    """
     layers = []
     in_f = input_dim
     act_cls = ACTIVATIONS[activation]
@@ -47,18 +30,7 @@ def build_mlp(input_dim, output_dim, hidden_layers, hidden_dim, activation):
     layers.append(nn.Linear(in_f, output_dim))
     return nn.Sequential(*layers).to(device)
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Обучение
-# ═══════════════════════════════════════════════════════════════════
-
-def train_model(model, X_train, y_train, X_val, y_val,
-                task='regression', epochs=300, lr=0.01):
-    """
-    Обучение с сохранением лучшей модели по val loss.
-    task='regression'      -> MSELoss
-    task='classification'  -> CrossEntropyLoss
-    """
+def train_model(model, X_train, y_train, X_val, y_val, task='regression', epochs=300, lr=0.01):
     loss_fn = nn.MSELoss() if task == 'regression' else nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
@@ -90,10 +62,7 @@ def train_model(model, X_train, y_train, X_val, y_val,
         model.load_state_dict(best_state)
     return history
 
-
-def train_no_early_stop(model, X_train, y_train, X_val, y_val,
-                        epochs=2500, lr=0.01):
-    """Обучение без ранней остановки (для демонстрации переобучения)."""
+def train_no_early_stop(model, X_train, y_train, X_val, y_val, epochs=2500, lr=0.01):
     loss_fn = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     history = {'train_loss': [], 'val_loss': []}
@@ -116,28 +85,17 @@ def train_no_early_stop(model, X_train, y_train, X_val, y_val,
 
     return history
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Предсказание
-# ═══════════════════════════════════════════════════════════════════
-
 def predict_regression(model, X_t, y_mean, y_std):
     model.eval()
     with torch.no_grad():
         pred = model(X_t).cpu().numpy()
     return pred * y_std + y_mean
 
-
 def predict_classes(model, X_t):
     model.eval()
     with torch.no_grad():
         logits = model(X_t)
         return torch.argmax(logits, dim=1).cpu().numpy()
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  Метрики
-# ═══════════════════════════════════════════════════════════════════
 
 def mse_np(y_true, y_pred):
     return float(np.mean((np.asarray(y_true) - np.asarray(y_pred)) ** 2))
@@ -154,5 +112,4 @@ def classification_metrics(y_true, y_pred):
     prec = tp / max(tp + fp, 1)
     rec = tp / max(tp + fn, 1)
     cm = np.array([[tn, fp], [fn, tp]])
-    return {'accuracy': float(acc), 'precision': float(prec),
-            'recall': float(rec), 'confusion_matrix': cm}
+    return {'accuracy': float(acc), 'precision': float(prec), 'recall': float(rec), 'confusion_matrix': cm}

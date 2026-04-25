@@ -1,29 +1,12 @@
-"""
-Задание 3 — Блок 1: Регрессия MLP.
-
-Перебор архитектур (активация × слои × нейроны) на двух функциях:
-  1. Случайный полином 3-й степени
-  2. x·sin(2πx)
-
-Визуализация лучших моделей + демонстрация переобучения.
-"""
-
 import copy
 import itertools
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 
 from config import SEED, REG_N, REG_EPS0, REG_EPOCHS, REG_LR, DPI
-from generators import (random_polynomial, trig_function,
-                         generate_regression_sample,
-                         train_test_split, standardize, standardize_targets)
-from mlp import (build_mlp, train_model, train_no_early_stop,
-                 predict_regression, mse_np, to_tensor)
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  Подготовка данных
-# ═══════════════════════════════════════════════════════════════════
+from generators import (random_polynomial, trig_function, generate_regression_sample, train_test_split, standardize, standardize_targets)
+from mlp import (build_mlp, train_model, train_no_early_stop, predict_regression, mse_np, to_tensor)
 
 poly_f, poly_coeffs = random_polynomial(seed=7)
 trig_f = trig_function()
@@ -32,25 +15,19 @@ REGRESSION_DATASETS = [
     {
         'name': 'Полином + равн. шум',
         'func': poly_f,
-        'data': generate_regression_sample(poly_f, REG_N, REG_EPS0,
-                                           noise_mode='uniform', seed=11),
+        'data': generate_regression_sample(poly_f, REG_N, REG_EPS0, noise_mode='uniform', seed=11),
     },
     {
         'name': 'x·sin(2πx) + норм. шум',
         'func': trig_f,
-        'data': generate_regression_sample(trig_f, REG_N, 0.12,
-                                           noise_mode='normal', sigma=0.05,
-                                           seed=13),
+        'data': generate_regression_sample(trig_f, REG_N, 0.12, noise_mode='normal', sigma=0.05, seed=13),
     },
 ]
 
+IMG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'images')
+DS_SLUG = {'Полином + равн. шум': 'poly', 'x·sin(2πx) + норм. шум': 'trig'}
 
-# ═══════════════════════════════════════════════════════════════════
-#  Перебор архитектур
-# ═══════════════════════════════════════════════════════════════════
-
-def run_regression_experiments(datasets, activations=('sigmoid', 'tanh', 'relu'),
-                               epochs=REG_EPOCHS, lr=REG_LR):
+def run_regression_experiments(datasets, activations=('sigmoid', 'tanh', 'relu'), epochs=REG_EPOCHS, lr=REG_LR):
     rows = []
     best_models = {}
     archs = list(itertools.product([1, 2, 3], [1, 2, 3, 4, 5]))
@@ -73,8 +50,7 @@ def run_regression_experiments(datasets, activations=('sigmoid', 'tanh', 'relu')
             best = None
             for h_layers, h_dim in archs:
                 model = build_mlp(1, 1, h_layers, h_dim, act)
-                hist = train_model(model, X_tr_t, y_tr_t, X_te_t, y_te_t,
-                                   task='regression', epochs=epochs, lr=lr)
+                hist = train_model(model, X_tr_t, y_tr_t, X_te_t, y_te_t, task='regression', epochs=epochs, lr=lr)
                 pred = predict_regression(model, X_te_t, y_m, y_s)
                 test_mse = mse_np(y_te, pred)
 
@@ -97,14 +73,8 @@ def run_regression_experiments(datasets, activations=('sigmoid', 'tanh', 'relu')
 
     return rows, best_models
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Сводная таблица
-# ═══════════════════════════════════════════════════════════════════
-
 def print_pivot(rows, ds_name, act):
-    subset = [r for r in rows
-              if r['dataset'] == ds_name and r['activation'] == act]
+    subset = [r for r in rows if r['dataset'] == ds_name and r['activation'] == act]
     all_layers = sorted({r['linear_layers'] for r in subset})
     all_dims = sorted({r['hidden_dim'] for r in subset})
 
@@ -115,17 +85,11 @@ def print_pivot(rows, ds_name, act):
     for nl in all_layers:
         line = f'{nl:<8}'
         for hd in all_dims:
-            val = next((r['test_mse'] for r in subset
-                        if r['linear_layers'] == nl and r['hidden_dim'] == hd), None)
+            val = next((r['test_mse'] for r in subset if r['linear_layers'] == nl and r['hidden_dim'] == hd), None)
             line += f'{val:<{col_w}.6f}' if val is not None else f'{"—":<{col_w}}'
         print(line)
 
-
-# ═══════════════════════════════════════════════════════════════════
-#  Визуализация лучших моделей
-# ═══════════════════════════════════════════════════════════════════
-
-def plot_best_regression(record):
+def plot_best_regression(record, save_path=None):
     model = record['model']
     func = record['func']
     x_m, x_s = record['x_mean'], record['x_std']
@@ -147,29 +111,22 @@ def plot_best_regression(record):
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
 
-    axes[1].scatter(record['x_train'][:, 0], record['y_train'][:, 0],
-                    s=16, alpha=0.65, label='train')
-    axes[1].scatter(record['x_test'][:, 0], record['y_test'][:, 0],
-                    s=20, alpha=0.8, label='test')
-    axes[1].plot(x_dense[:, 0], func(x_dense[:, 0]),
-                 color='black', lw=2, label='истинная f(x)')
-    axes[1].plot(x_dense[:, 0], y_dense[:, 0],
-                 color='crimson', lw=2, label='MLP')
-    axes[1].set_title(
-        f"{record['dataset']} | test MSE = {record['test_mse']:.4f}")
+    axes[1].scatter(record['x_train'][:, 0], record['y_train'][:, 0], s=16, alpha=0.65, label='train')
+    axes[1].scatter(record['x_test'][:, 0], record['y_test'][:, 0], s=20, alpha=0.8, label='test')
+    axes[1].plot(x_dense[:, 0], func(x_dense[:, 0]), color='black', lw=2, label='истинная f(x)')
+    axes[1].plot(x_dense[:, 0], y_dense[:, 0], color='crimson', lw=2, label='MLP')
+    axes[1].set_title( f"{record['dataset']} | test MSE = {record['test_mse']:.4f}")
     axes[1].set_xlabel('x')
     axes[1].set_ylabel('y')
     axes[1].legend()
     axes[1].grid(True, alpha=0.3)
 
     plt.tight_layout()
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        fig.savefig(save_path, dpi=DPI, bbox_inches='tight')
     plt.show()
     plt.close()
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  Переобучение на x·sin(2πx)
-# ═══════════════════════════════════════════════════════════════════
 
 def run_overfit_demo():
     ds = next(d for d in REGRESSION_DATASETS if 'sin' in d['name'])
@@ -192,8 +149,7 @@ def run_overfit_demo():
     y_te_t = to_tensor(y_te_s)
 
     model = build_mlp(1, 1, hidden_layers=8, hidden_dim=5, activation='tanh')
-    hist = train_no_early_stop(model, X_tr_t, y_tr_t, X_te_t, y_te_t,
-                               epochs=5000, lr=0.01)
+    hist = train_no_early_stop(model, X_tr_t, y_tr_t, X_te_t, y_te_t, epochs=5000, lr=0.01)
 
     pred_tr = predict_regression(model, X_tr_t, y_m, y_s)
     pred_te = predict_regression(model, X_te_t, y_m, y_s)
@@ -208,7 +164,6 @@ def run_overfit_demo():
     print(f'  Test  MSE: {te_mse:.6f}')
     print(f'  Лучшая эпоха по val loss: {best_epoch}')
 
-    # ── График ──
     x_dense = np.linspace(-1, 1, 500).reshape(-1, 1)
     x_dense_s = (x_dense - x_m) / x_s
     y_dense = predict_regression(model, to_tensor(x_dense_s), y_m, y_s)
@@ -217,8 +172,7 @@ def run_overfit_demo():
 
     axes[0].plot(hist['train_loss'], label='train loss')
     axes[0].plot(hist['val_loss'], label='test loss')
-    axes[0].axvline(best_epoch - 1, color='crimson', ls='--',
-                    label='минимум test loss')
+    axes[0].axvline(best_epoch - 1, color='crimson', ls='--', label='минимум test loss')
     axes[0].set_title('Переобучение: train / test loss')
     axes[0].set_xlabel('epoch')
     axes[0].set_ylabel('loss')
@@ -227,10 +181,8 @@ def run_overfit_demo():
 
     axes[1].scatter(X_tr[:, 0], y_tr[:, 0], s=28, alpha=0.85, label='train')
     axes[1].scatter(X_te[:, 0], y_te[:, 0], s=24, alpha=0.65, label='test')
-    axes[1].plot(x_dense[:, 0], func(x_dense[:, 0]),
-                 color='black', lw=2, label='истинная f(x)')
-    axes[1].plot(x_dense[:, 0], y_dense[:, 0],
-                 color='crimson', lw=2, label='MLP (переобучение)')
+    axes[1].plot(x_dense[:, 0], func(x_dense[:, 0]), color='black', lw=2, label='истинная f(x)')
+    axes[1].plot(x_dense[:, 0], y_dense[:, 0], color='crimson', lw=2, label='MLP (переобучение)')
     axes[1].set_title('Переобученная аппроксимация x·sin(2πx)')
     axes[1].set_xlabel('x')
     axes[1].set_ylabel('y')
@@ -238,13 +190,10 @@ def run_overfit_demo():
     axes[1].grid(True, alpha=0.3)
 
     plt.tight_layout()
+    os.makedirs(IMG_DIR, exist_ok=True)
+    fig.savefig(os.path.join(IMG_DIR, 'overfit.png'), dpi=DPI, bbox_inches='tight')
     plt.show()
     plt.close()
-
-
-# ═══════════════════════════════════════════════════════════════════
-#  main
-# ═══════════════════════════════════════════════════════════════════
 
 def main():
     print(f'Коэффициенты полинома: {poly_coeffs}')
@@ -269,7 +218,8 @@ def main():
         print(f'  {ds_name} | {act}: '
               f'слоёв={rec["linear_layers"]}, нейронов={rec["hidden_dim"]}, '
               f'MSE={rec["test_mse"]:.6f}')
-        plot_best_regression(rec)
+        slug = DS_SLUG.get(ds_name, ds_name)
+        plot_best_regression(rec, save_path=os.path.join(IMG_DIR, f'reg_{slug}_{act}.png'))
 
     print('\n── Демонстрация переобучения ──')
     run_overfit_demo()
