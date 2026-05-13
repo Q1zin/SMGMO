@@ -1,0 +1,109 @@
+================================================================================
+ Задание 4 — Блок 2: оптимизаторы и переобучение (MNIST)
+ Устройство: cuda
+================================================================================
+================================================================================
+ Сравнение оптимизаторов и learning rate
+================================================================================
+ Базовая архитектура: block=b, channels=(32, 64), conv_k=3
+
+--- Adam | lr=0.001 ---
+  [Adam-0.001] эпоха   1/10 | train_loss=2.0240 val_loss=1.5198 | train_acc=0.2462 val_acc=0.4805
+  [Adam-0.001] эпоха   2/10 | train_loss=1.2073 val_loss=0.8631 | train_acc=0.6126 val_acc=0.7510
+  [Adam-0.001] эпоха   3/10 | train_loss=0.6939 val_loss=0.5521 | train_acc=0.8006 val_acc=0.8365
+  [Adam-0.001] эпоха   4/10 | train_loss=0.4511 val_loss=0.4550 | train_acc=0.8699 val_acc=0.8615
+  [Adam-0.001] эпоха   5/10 | train_loss=0.3624 val_loss=0.3924 | train_acc=0.8925 val_acc=0.8845
+  [Adam-0.001] эпоха   6/10 | train_loss=0.3141 val_loss=0.2824 | train_acc=0.9030 val_acc=0.9235
+  [Adam-0.001] эпоха   7/10 | train_loss=0.2720 val_loss=0.2998 | train_acc=0.9169 val_acc=0.9085
+  [Adam-0.001] эпоха   8/10 | train_loss=0.2310 val_loss=0.2576 | train_acc=0.9301 val_acc=0.9240
+  [Adam-0.001] эпоха   9/10 | train_loss=0.2362 val_loss=0.2603 | train_acc=0.9290 val_acc=0.9205
+  [Adam-0.001] эпоха  10/10 | train_loss=0.2221 val_loss=0.2002 | train_acc=0.9294 val_acc=0.9405
+
+--- Adam | lr=0.003 ---
+  [Adam-0.003] эпоха   1/10 | train_loss=1.7794 val_loss=1.2899 | train_acc=0.3463 val_acc=0.5425
+  [Adam-0.003] эпоха   2/10 | train_loss=0.7595 val_loss=0.4880 | train_acc=0.7442 val_acc=0.8535
+  [Adam-0.003] эпоха   3/10 | train_loss=0.3921 val_loss=0.3877 | train_acc=0.8818 val_acc=0.8790
+  [Adam-0.003] эпоха   4/10 | train_loss=0.2703 val_loss=0.2441 | train_acc=0.9184 val_acc=0.9320
+  [Adam-0.003] эпоха   5/10 | train_loss=0.2221 val_loss=0.2734 | train_acc=0.9300 val_acc=0.9250
+  [Adam-0.003] эпоха   6/10 | train_loss=0.2129 val_loss=0.1543 | train_acc=0.9330 val_acc=0.9575
+  [Adam-0.003] эпоха   7/10 | train_loss=0.1545 val_loss=0.1679 | train_acc=0.9526 val_acc=0.9460
+  [Adam-0.003] эпоха   8/10 | train_loss=0.1381 val_loss=0.1647 | train_acc=0.9576 val_acc=0.9555
+  [Adam-0.003] эпоха   9/10 | train_loss=0.1364 val_loss=0.1482 | train_acc=0.9547 val_acc=0.9595
+  [Adam-0.003] эпоха  10/10 | train_loss=0.1118 val_loss=0.1169 | train_acc=0.9636 val_acc=0.9685
+
+--- AdamW | lr=0.001 ---
+  [AdamW-0.001] эпоха   1/10 | train_loss=2.0261 val_loss=1.5262 | train_acc=0.2462 val_acc=0.4745
+  [AdamW-0.001] эпоха   2/10 | train_loss=1.2086 val_loss=0.8639 | train_acc=0.6102 val_acc=0.7470
+  [AdamW-0.001] эпоха   3/10 | train_loss=0.6878 val_loss=0.5385 | train_acc=0.8034 val_acc=0.8450
+  [AdamW-0.001] эпоха   4/10 | train_loss=0.4511 val_loss=0.4519 | train_acc=0.8712 val_acc=0.8615
+  [AdamW-0.001] эпоха   5/10 | train_loss=0.3675 val_loss=0.3750 | train_acc=0.8908 val_acc=0.8895
+  [AdamW-0.001] эпоха   6/10 | train_loss=0.3082 val_loss=0.2750 | train_acc=0.9046 val_acc=0.9265
+  [AdamW-0.001] эпоха   7/10 | train_loss=0.2728 val_loss=0.3198 | train_acc=0.9144 val_acc=0.9005
+  [AdamW-0.001] эпоха   8/10 | train_loss=0.2330 val_loss=0.2566 | train_acc=0.9296 val_acc=0.9255
+  [AdamW-0.001] эпоха   9/10 | train_loss=0.2316 val_loss=0.2503 | train_acc=0.9311 val_acc=0.9280
+  [AdamW-0.001] эпоха  10/10 | train_loss=0.2183 val_loss=0.1995 | train_acc=0.9290 val_acc=0.9390
+
+--- SGD | lr=0.01 ---
+  [SGD-0.01] эпоха   1/10 | train_loss=2.3000 val_loss=2.2908 | train_acc=0.1131 val_acc=0.1525
+  [SGD-0.01] эпоха   2/10 | train_loss=2.2789 val_loss=2.2561 | train_acc=0.1214 val_acc=0.1495
+  [SGD-0.01] эпоха   3/10 | train_loss=2.2322 val_loss=2.1549 | train_acc=0.1959 val_acc=0.2610
+  [SGD-0.01] эпоха   4/10 | train_loss=2.0157 val_loss=1.8239 | train_acc=0.2615 val_acc=0.3440
+  [SGD-0.01] эпоха   5/10 | train_loss=1.6527 val_loss=1.3376 | train_acc=0.4228 val_acc=0.5320
+  [SGD-0.01] эпоха   6/10 | train_loss=1.5687 val_loss=1.2464 | train_acc=0.5574 val_acc=0.6275
+  [SGD-0.01] эпоха   7/10 | train_loss=0.8083 val_loss=0.6426 | train_acc=0.7571 val_acc=0.8015
+  [SGD-0.01] эпоха   8/10 | train_loss=0.4493 val_loss=0.4072 | train_acc=0.8640 val_acc=0.8855
+  [SGD-0.01] эпоха   9/10 | train_loss=0.3644 val_loss=0.3590 | train_acc=0.8865 val_acc=0.8895
+  [SGD-0.01] эпоха  10/10 | train_loss=0.2763 val_loss=0.2418 | train_acc=0.9170 val_acc=0.9360
+
+--- SGD | lr=0.05 ---
+  [SGD-0.05] эпоха   1/10 | train_loss=2.2670 val_loss=2.1302 | train_acc=0.1521 val_acc=0.2055
+  [SGD-0.05] эпоха   2/10 | train_loss=2.4623 val_loss=2.2850 | train_acc=0.1519 val_acc=0.1250
+  [SGD-0.05] эпоха   3/10 | train_loss=2.1817 val_loss=2.0530 | train_acc=0.1978 val_acc=0.2185
+  [SGD-0.05] эпоха   4/10 | train_loss=2.1696 val_loss=2.2009 | train_acc=0.2417 val_acc=0.2435
+  [SGD-0.05] эпоха   5/10 | train_loss=2.0350 val_loss=1.9353 | train_acc=0.2371 val_acc=0.2895
+  [SGD-0.05] эпоха   6/10 | train_loss=1.7791 val_loss=6.1697 | train_acc=0.3531 val_acc=0.1175
+  [SGD-0.05] эпоха   7/10 | train_loss=1.7840 val_loss=1.6955 | train_acc=0.4226 val_acc=0.3575
+  [SGD-0.05] эпоха   8/10 | train_loss=1.1714 val_loss=0.9567 | train_acc=0.6230 val_acc=0.7120
+  [SGD-0.05] эпоха   9/10 | train_loss=0.8892 val_loss=0.7430 | train_acc=0.7334 val_acc=0.7810
+  [SGD-0.05] эпоха  10/10 | train_loss=0.5016 val_loss=0.4915 | train_acc=0.8491 val_acc=0.8550
+
+Итог сравнения:
+  optimizer |      lr |  best_val | ep@90
+  --------------------------------------
+       Adam |  0.0010 |    0.9405 |     6
+       Adam |  0.0030 |    0.9685 |     4
+      AdamW |  0.0010 |    0.9390 |     6
+        SGD |  0.0100 |    0.9360 |    10
+        SGD |  0.0500 |    0.8550 |     —
+
+img: ./MNIST-2-9.png
+
+================================================================================
+ Демонстрация переобучения на малой подвыборке
+================================================================================
+ train: 240 | val: 60
+
+--- без регуляризации (dropout=0) ---
+  [no-reg] эпоха   1/120 | train_loss=2.3060 val_loss=2.2915 | train_acc=0.0958 val_acc=0.1500
+  [no-reg] эпоха  20/120 | train_loss=1.7803 val_loss=1.8637 | train_acc=0.3625 val_acc=0.2833
+  [no-reg] эпоха  40/120 | train_loss=1.3430 val_loss=1.3732 | train_acc=0.5208 val_acc=0.5333
+  [no-reg] эпоха  60/120 | train_loss=0.8929 val_loss=1.0687 | train_acc=0.7542 val_acc=0.6667
+  [no-reg] эпоха  80/120 | train_loss=0.5457 val_loss=0.8572 | train_acc=0.8500 val_acc=0.7833
+  [no-reg] эпоха 100/120 | train_loss=0.3600 val_loss=0.7820 | train_acc=0.9000 val_acc=0.8000
+  [no-reg] эпоха 120/120 | train_loss=0.2471 val_loss=0.6912 | train_acc=0.9542 val_acc=0.8500
+
+--- с Dropout=0.4 ---
+  [dropout] эпоха   1/120 | train_loss=2.3067 val_loss=2.2980 | train_acc=0.0917 val_acc=0.1500
+  [dropout] эпоха  20/120 | train_loss=1.9282 val_loss=1.9720 | train_acc=0.3000 val_acc=0.2833
+  [dropout] эпоха  40/120 | train_loss=1.6329 val_loss=1.6549 | train_acc=0.3792 val_acc=0.3500
+  [dropout] эпоха  60/120 | train_loss=1.3533 val_loss=1.2831 | train_acc=0.4833 val_acc=0.6667
+  [dropout] эпоха  80/120 | train_loss=1.0356 val_loss=1.0055 | train_acc=0.6125 val_acc=0.7167
+  [dropout] эпоха 100/120 | train_loss=0.8839 val_loss=0.7326 | train_acc=0.6833 val_acc=0.8833
+  [dropout] эпоха 120/120 | train_loss=0.6576 val_loss=0.6317 | train_acc=0.7792 val_acc=0.8833
+
+
+img: ./MNIST-2-10.png
+
+Итог переобучения:
+  без рег.       | train_acc=0.9542 | val_acc=0.8500 | gap=+0.1042
+  dropout 0.4    | train_acc=0.7792 | val_acc=0.8833 | gap=-0.1042
